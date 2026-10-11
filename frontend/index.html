@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f4f2e9" />
+    <meta name="description" content="A local-first FIFA knowledge graph and evidence workbench." />
+    <title>Touchline — FIFA research workbench</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar" aria-label="Workspace and session history">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <div class="brand-name">touchline<span>.</span><small>FIFA research desk</small></div>
+          <button class="icon-button sidebar-close" id="sidebar-close" type="button" aria-label="Close sidebar">×</button>
+        </div>
+
+        <button class="new-chat-button" id="new-chat" type="button">
+          <span class="plus-icon" aria-hidden="true">＋</span><span>New question</span><kbd>⌘ K</kbd>
+        </button>
+
+        <div class="sidebar-section-label"><span>RECENT SESSIONS</span><span id="history-count">0</span></div>
+        <nav class="session-list" id="session-list" aria-label="Recent sessions"></nav>
+        <div class="sidebar-spacer"></div>
+
+        <section class="workspace-card" aria-labelledby="workspace-title">
+          <div class="workspace-heading"><span class="status-orbit" id="workspace-orbit"></span><span id="workspace-title">Local workspace</span></div>
+          <p id="workspace-summary">Checking connected sources…</p>
+          <button class="workspace-link" type="button" data-open-inspector="system">View source status <span aria-hidden="true">↗</span></button>
+        </section>
+        <div class="sidebar-foot"><span class="tiny-ball" aria-hidden="true">●</span> Made for the beautiful game <span class="foot-year">· 2026</span></div>
+      </aside>
+
+      <main class="workbench">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="icon-button menu-button" id="menu-button" type="button" aria-label="Open sidebar">☰</button>
+            <div class="breadcrumb"><span>Knowledge base</span><span class="crumb-slash">/</span><strong id="current-title">New session</strong></div>
+          </div>
+          <div class="topbar-actions">
+            <span class="health-pill" id="health-pill" role="status"><i></i><span>Connecting</span></span>
+            <button class="icon-button inspector-toggle" id="inspector-toggle" type="button" aria-label="Toggle research inspector" aria-pressed="true"><span class="inspector-glyph" aria-hidden="true">▥</span></button>
+            <button class="avatar-chip" type="button" aria-label="Local FIFA knowledge base">F<span>·</span></button>
+          </div>
+        </header>
+
+        <section class="chat-column" aria-label="Question and answer workspace">
+          <div class="conversation" id="conversation" aria-live="polite" aria-relevant="additions text">
+            <section class="welcome" id="welcome">
+              <div class="welcome-copy">
+                <div class="eyebrow"><span class="eyebrow-line"></span> THE WORLD CUP, CONNECTED</div>
+                <h1>Every tournament<br />has a <em>story.</em></h1>
+                <p>Follow the teams, players, matches and moments that shaped the world’s game. Ask a question; see the evidence behind every answer.</p>
+                <div class="welcome-capabilities" aria-label="Available research modes">
+                  <span><b class="cap-dot dot-graph"></b>Knowledge graph</span>
+                  <span><b class="cap-dot dot-semantic"></b>Source passages</span>
+                  <span><b class="cap-dot dot-hybrid"></b>Evidence together</span>
+                </div>
+              </div>
+              <div class="pitch-art" id="pitch-art-wrap">
+                <canvas id="pitch-canvas" aria-hidden="true"></canvas>
+                <div class="pitch-caption"><span>90′</span><span>THE ARCHIVE, IN PLAY</span></div>
+                <p class="pitch-text-alternative">An abstract, gently animated football pitch, drawn as a decorative illustration.</p>
+              </div>
+              <div class="suggestion-area">
+                <div class="suggestion-heading"><span>START WITH A QUESTION</span><span>↘</span></div>
+                <div class="suggestion-grid" id="suggestion-grid"></div>
+              </div>
+            </section>
+            <div class="message-list" id="message-list"></div>
+            <div class="scroll-anchor" id="scroll-anchor"></div>
+          </div>
+
+          <footer class="composer-dock">
+            <form class="composer" id="query-form">
+              <label class="sr-only" for="question-input">Ask about FIFA World Cup history</label>
+              <textarea id="question-input" rows="1" placeholder="Ask about a tournament, team, player or match…" maxlength="2000"></textarea>
+              <div class="composer-controls">
+                <div class="composer-left-controls">
+                  <label class="mode-control"><span class="mode-spark" aria-hidden="true">✳</span><span class="sr-only">Research mode</span>
+                    <select id="mode-select" aria-label="Research mode">
+                      <option value="hybrid" selected>Hybrid search</option>
+                      <option value="graph">Knowledge graph</option>
+                      <option value="semantic">Source passages</option>
+                      <option value="auto">Automatic</option>
+                    </select><span class="select-chevron" aria-hidden="true">⌄</span>
+                  </label>
+                  <span class="control-divider" aria-hidden="true"></span>
+                  <label class="top-k-control"><span>Sources</span>
+                    <select id="top-k-select" aria-label="Number of source passages">
+                      <option value="3">3</option><option value="6" selected>6</option><option value="9">9</option><option value="12">12</option>
+                    </select>
+                  </label>
+                  <span class="control-divider tournament-divider" aria-hidden="true"></span>
+                  <label class="tournament-control"><span class="sr-only">Filter by tournament (optional)</span>
+                    <input id="tournament-input" type="text" list="tournament-options" maxlength="100" placeholder="All tournaments" autocomplete="off" />
+                    <datalist id="tournament-options"></datalist>
+                  </label>
+                </div>
+                <div class="composer-right-controls">
+                  <label class="generate-control" id="generate-control" title="Plans graph queries and writes cited answers; uses your Groq key">
+                    <input id="generate-toggle" type="checkbox" disabled />
+                    <span class="switch" aria-hidden="true"><i></i></span><span class="generate-label">Groq reasoning</span><span class="generate-lock" id="generate-lock" aria-hidden="true">⌑</span>
+                  </label>
+                  <button class="send-button" id="send-button" type="submit" aria-label="Send question">
+                    <span class="send-button-text">Ask</span><span class="send-arrow" aria-hidden="true">↑</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+            <div class="composer-note"><span>Answers are grounded in the connected archive.</span><span><kbd>↵</kbd> to ask <span class="note-dot">·</span> <kbd>⇧ ↵</kbd> new line</span></div>
+          </footer>
+        </section>
+      </main>
+
+      <aside class="inspector" id="inspector" aria-label="Research inspector">
+        <div class="inspector-header">
+          <div><div class="eyebrow inspector-eyebrow">ON THE TOUCHLINE</div><h2>Research desk</h2></div>
+          <button class="icon-button inspector-close" id="inspector-close" type="button" aria-label="Close research desk">×</button>
+        </div>
+        <div class="inspector-tabs" role="tablist" aria-label="Research desk sections">
+          <button class="inspector-tab is-active" id="tab-evidence" type="button" role="tab" aria-selected="true" aria-controls="panel-evidence" data-tab="evidence">Evidence <span id="evidence-tab-count"></span></button>
+          <button class="inspector-tab" id="tab-graph" type="button" role="tab" aria-selected="false" aria-controls="panel-graph" data-tab="graph">Graph</button>
+          <button class="inspector-tab" id="tab-system" type="button" role="tab" aria-selected="false" aria-controls="panel-system" data-tab="system">Sources</button>
+        </div>
+        <div class="inspector-panel is-active" id="panel-evidence" role="tabpanel" aria-labelledby="tab-evidence">
+          <div class="panel-intro"><span class="panel-kicker">CITED PASSAGES</span><p id="evidence-intro">Ask a question to inspect the passages and entities behind the answer.</p></div>
+          <div id="evidence-list" class="evidence-list"></div>
+          <div id="evidence-empty" class="inspector-empty"><span class="empty-symbol">⌕</span><strong>Trace every answer</strong><p>Source passages and extracted entities will appear here.</p></div>
+        </div>
+        <div class="inspector-panel" id="panel-graph" role="tabpanel" aria-labelledby="tab-graph" hidden>
+          <div class="panel-intro graph-intro"><span class="panel-kicker">ENTITY NEIGHBOURHOOD</span><p>Explore the connected record. Select a node or edge to inspect it.</p></div>
+          <form class="entity-search" id="entity-search-form">
+            <label class="sr-only" for="entity-search">Search entities</label><span aria-hidden="true">⌕</span><input id="entity-search" type="search" placeholder="Find a team, player, match…" autocomplete="off" />
+            <button type="submit" aria-label="Search entities">↵</button>
+          </form>
+          <div class="entity-results" id="entity-results" role="listbox" aria-label="Matching archive entities" aria-live="polite" hidden></div>
+          <div class="graph-toolbar"><span id="graph-count">No graph loaded</span><div><button type="button" id="zoom-out" aria-label="Zoom out">−</button><button type="button" id="zoom-reset" aria-label="Reset graph view">⌂</button><button type="button" id="zoom-in" aria-label="Zoom in">＋</button></div></div>
+          <div class="graph-viewport" id="graph-viewport" tabindex="0" role="region" aria-label="Interactive knowledge graph. Use the entity list below to navigate by keyboard.">
+            <svg id="graph-svg" viewBox="0 0 520 360" aria-hidden="true"><g id="graph-stage"></g></svg>
+            <div class="graph-placeholder" id="graph-placeholder"><span class="graph-placeholder-mark">◌</span><span>Relationships from your question will appear here.</span></div>
+          </div>
+          <div class="graph-selection" id="graph-selection" aria-live="polite"></div>
+          <div class="graph-alternative"><div class="list-heading"><span>ACCESSIBLE ENTITY LIST</span><span id="graph-list-count">0</span></div><div class="graph-node-list" id="graph-node-list"></div><div class="graph-edge-list" id="graph-edge-list"></div></div>
+        </div>
+        <div class="inspector-panel" id="panel-system" role="tabpanel" aria-labelledby="tab-system" hidden>
+          <div class="panel-intro"><span class="panel-kicker">CONNECTION STATUS</span><p>Live availability reported by the local research service.</p></div>
+          <div class="source-cards" id="source-cards"></div>
+          <div class="diagnostics-block"><div class="list-heading"><span>DIAGNOSTICS</span><button type="button" id="refresh-status">Refresh</button></div><div id="diagnostics-list" class="diagnostics-list"></div></div>
+          <p class="local-note">Questions and source text are processed by the local service. Optional answer generation is controlled by its configuration.</p>
+        </div>
+      </aside>
+    </div>
+    <div class="mobile-scrim" id="mobile-scrim"></div>
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+  </body>
+</html>

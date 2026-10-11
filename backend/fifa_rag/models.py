@@ -1,4 +1,5 @@
 from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 Mode = Literal["graph", "semantic", "hybrid", "auto"]
@@ -17,6 +18,7 @@ class QueryRequest(BaseModel):
     mode: Mode = "hybrid"
     top_k: int = Field(default=6, ge=1, le=12)
     generate: bool = False
+    graph_reasoning: bool = False
     tournament: str | None = Field(default=None, max_length=100)
 
     @field_validator("question")
@@ -35,5 +37,6 @@ class QueryResponse(BaseModel):
     evidence: list[Evidence]
     diagnostics: list[str] = Field(default_factory=list)
     generation: str
+    graph_query: dict | None = None
     elapsed_ms: float
     graph: dict = Field(default_factory=lambda: {"nodes": [], "edges": []})

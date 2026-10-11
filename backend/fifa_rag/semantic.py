@@ -18,14 +18,14 @@ from typing import Any
 import kuzu
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer
 from sklearn.preprocessing import normalize
 
 from .models import Evidence
 
 _FORMAT_VERSION = 1
 _TOKEN_PATTERN = r"(?u)\b\w\w+\b"
-_CONTEXT_RE = re.compile(r"^\[Context:\s*(.*?)\s*\|\s*Section:\s*(.*?)\s*\]\s*$", re.M)
+_CONTEXT_RE = re.compile(r"^\[Context:\s*(.*?)\s*\|\s*Section:\s*(.*?)\s*\]\s*$", re.MULTILINE)
 
 
 def _sha256(path: Path) -> str:
@@ -64,15 +64,14 @@ def _graph_documents(graph_path: str | Path) -> list[dict[str, Any]]:
     try:
         rows = connection.execute(
             "MATCH (c:Chunk) OPTIONAL MATCH (c)-[:MENTIONS]->(e) "
-            "RETURN c.chunk_id AS chunk_id, c.text AS text, "
-            "e._label AS entity_type, e.id AS entity_id"
+            "RETURN c.chunk_id AS chunk_id, c.text AS text, e AS entity"
         ).get_all()
     finally:
         connection.close()
         database.close()
 
     documents: dict[str, dict[str, Any]] = {}
-    for chunk_id, text, entity_type, entity_id in rows:
+    for chunk_id, text, entity in rows:
         if not chunk_id or not isinstance(text, str) or not text.strip():
             continue
         document = documents.setdefault(
@@ -95,13 +94,16 @@ def _graph_documents(graph_path: str | Path) -> list[dict[str, Any]]:
                 "document_type": "chunk",
             }
         )
-        if entity_id:
-            entity = str(entity_id)
-            if entity not in document["entities"]:
-                document["entities"].append(entity)
+        if entity:
+            entity_id = entity.get("id")
+            entity_type = entity.get("_label")
+            if entity_id:
+                entity_id = str(entity_id)
+                if entity_id not in document["entities"]:
+                    document["entities"].append(entity_id)
             links = document["metadata"].setdefault("entity_ids", [])
-            if entity not in links:
-                links.append(entity)
+            if entity_id and entity_id not in links:
+                links.append(entity_id)
             if entity_type:
                 types = document["metadata"].setdefault("entity_types", [])
                 if str(entity_type) not in types:
@@ -126,7 +128,11 @@ def _write_snapshot(root: Path, documents: list[dict[str, Any]]) -> str:
         os.fsync(stream.fileno())
 
     texts = [document["text"] for document in documents]
-    arrays: dict[str, np.ndarray] = {}
+    arrays: dict[str, np.ndarray] = {
+        "components": np.empty((0, 0), dtype=np.float32),
+        "idf": np.empty((0,), dtype=np.float32),
+        "embeddings": np.zeros((len(documents), 0), dtype=np.float32),
+    }
     vocab: dict[str, int] = {}
     dimension = 0
     if texts:
@@ -244,6 +250,7 @@ class SemanticStore:
                 )
                 vectorizer.vocabulary_ = self._vocabulary
                 vectorizer.fixed_vocabulary_ = True
+                vectorizer._tfidf = TfidfTransformer(norm="l2", use_idf=True, sublinear_tf=True)
                 vectorizer._tfidf.idf_ = self._idf
                 self._vectorizer = vectorizer
         except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
@@ -253,6 +260,7 @@ class SemanticStore:
     def health(self) -> dict[str, Any]:
         return {
             "available": self._error is None and bool(self._documents),
+            "method": "TF–IDF / latent semantic analysis",
             "document_count": len(self._documents),
             "dimension": int(self._manifest.get("dimension", 0)),
             "version": self._manifest.get("version"),
@@ -260,13 +268,15 @@ class SemanticStore:
         }
 
     def search(self, question: str, top_k: int = 6, tournament: str | None = None) -> list[Evidence]:
+        if self._error:
+            raise RuntimeError(f"Semantic index unavailable: {self._error}")
         if not question or not self._documents or self._vectorizer is None:
             return []
         query = normalize(self._vectorizer.transform([" ".join(question.split())]), norm="l2")
         if query.nnz == 0:
             return []
         if self._components.size:
-            vector = normalize(query @ self._components.T, norm="l2").toarray()[0]
+            vector = np.asarray(normalize(query @ self._components.T, norm="l2"))[0]
         else:
             vector = query.toarray()[0]
         if not np.any(vector):
@@ -279,7 +289,8 @@ class SemanticStore:
             stored_tournament = metadata.get("tournament")
             if requested and (not stored_tournament or requested not in stored_tournament.casefold()):
                 continue
-            filtered.append((float(score), document))
+            if score > 0.05:
+                filtered.append((float(score), document))
         filtered.sort(key=lambda item: item[0], reverse=True)
         return [
             Evidence(

@@ -1,5 +1,6 @@
 """Independent retrieval paths and reciprocal-rank evidence fusion."""
 import logging
+
 from .models import Evidence, QueryRequest
 
 log = logging.getLogger(__name__)

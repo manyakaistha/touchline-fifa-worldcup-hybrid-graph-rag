@@ -1,6 +1,9 @@
 """Read-only Kuzu access with bounded, schema-derived retrieval."""
+import json
 import logging
 import re
+import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -29,7 +32,7 @@ def validate_cypher(query: str) -> str:
         raise ValueError("A graph query must start with MATCH and include RETURN.")
     if re.search(r"\b(CREATE|MERGE|SET|DELETE|DETACH|DROP|ALTER|COPY|CALL|LOAD|INSTALL|ATTACH|IMPORT|EXPORT|BEGIN|COMMIT|ROLLBACK|UNION|REMOVE|FOREACH)\b", scrubbed, re.I):
         raise ValueError("Only read-only graph patterns are allowed.")
-    if re.search(r"\*\s*\d*\s*\.\.|\[\s*\*", scrubbed):
+    if re.search(r"\[[^\]]*\*", scrubbed):
         raise ValueError("Variable-length traversal is disabled.")
     limits = re.findall(r"\bLIMIT\s+(\d+)\b", scrubbed, re.I)
     if not limits:
@@ -50,6 +53,7 @@ class GraphStore:
         self.node_counts = {}
         self.relationship_counts = {}
         self.schema = []
+        self.properties = {}
         self.entity_catalog = []
         try:
             if not self.path.is_file():
@@ -65,6 +69,7 @@ class GraphStore:
                 name = table["name"]
                 if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name):
                     continue
+                self.properties[name] = self._execute(f"CALL table_info('{name}') RETURN *")
                 if table["type"] == "NODE":
                     self.node_counts[name] = self._execute(f"MATCH (n:`{name}`) RETURN count(n) AS count")[0]["count"]
                 else:
@@ -87,11 +92,42 @@ class GraphStore:
     def health(self) -> dict:
         return {"available": self.conn is not None, "error": self.error, "engine": "Kuzu", "version": "0.11.3",
                 "node_counts": self.node_counts, "relationship_counts": self.relationship_counts,
-                "read_only": True}
+                "read_only": True, "warnings": ["Relationship chunk_id values are unreliable in this supplied snapshot; evidence uses MENTIONS links and original text."]}
+
+    def schema_context(self) -> dict:
+        return {"tables": self.schema, "properties": self.properties}
+
+    def planned_evidence(self, result: dict, top_k: int, tournament: str | None = None) -> list[Evidence]:
+        ids = []
+        for row in result["rows"]:
+            for key, value in row.items():
+                if key in ("chunk_id", "chunk_ids"):
+                    values = value if isinstance(value, list) else [value]
+                    ids.extend(v for v in values if isinstance(v, str))
+        ids = list(dict.fromkeys(ids))[:50]
+        if not ids:
+            return []
+        chunks = self._execute("MATCH (c:Chunk) WHERE c.chunk_id IN $ids RETURN c.chunk_id AS id, c.text AS text LIMIT 50", {"ids": ids})
+        return [Evidence(id=c["id"], text=c["text"], source="Kaggle FIFA World Cup Wikipedia / graph Chunk",
+                         methods=["graph"], score=1/(i+1), metadata={"provenance": "existing Chunk IDs returned by validated hosted Cypher"})
+                for i, c in enumerate(chunks) if not tournament or tournament.casefold() in c["text"].casefold()][:top_k]
 
     def query(self, query: str, parameters: dict | None = None) -> dict:
         query = validate_cypher(query)
-        return {"query": query, "rows": self._execute(query, parameters)[:100]}
+        if not self.conn:
+            raise RuntimeError(self.error or "Graph unavailable")
+        payload = {"path": str(self.path), "query": query, "parameters": parameters or {}, "timeout_ms": self.timeout_ms}
+        try:
+            process = subprocess.run([sys.executable, "-m", "fifa_rag.graph_worker"], input=json.dumps(payload),
+                                     capture_output=True, text=True, timeout=self.timeout_ms / 1000 + 3)
+            if process.returncode:
+                raise RuntimeError("The isolated graph query failed; the application remains available.")
+            result = json.loads(process.stdout)
+            if "error" in result:
+                raise RuntimeError(result["error"])
+            return {"query": query, "rows": result["rows"]}
+        except (subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
+            raise RuntimeError("The isolated graph query timed out or returned an invalid result.") from exc
 
     def entities(self, q: str = "", label: str | None = None, limit: int = 20) -> list[dict]:
         if not self.conn:
@@ -127,8 +163,6 @@ class GraphStore:
         for entity in matches:
             label = entity["label"]
             chunks = self._execute(f"MATCH (c:Chunk)-[:MENTIONS]->(n:{label}) WHERE n.id = $id RETURN c.chunk_id AS id, c.text AS text LIMIT 200", {"id": entity["id"]})
-            # Retrieve source chunks attached to actual edges, including adjacent entities.
-            chunks += self._execute(f"MATCH (n:{label})-[r]-(other) MATCH (c:Chunk) WHERE n.id = $id AND c.chunk_id = r.chunk_id RETURN DISTINCT c.chunk_id AS id, c.text AS text LIMIT 200", {"id": entity["id"]})
             for chunk in chunks:
                 if years and not any(year in chunk["text"].split("\n", 1)[0] for year in years):
                     continue
@@ -144,25 +178,32 @@ class GraphStore:
         ranked = sorted(found.values(), key=lambda c: (-c["score"], c["id"]))[:top_k]
         return [Evidence(id=item["id"], text=item["text"], source="Kaggle FIFA World Cup Wikipedia / graph Chunk",
                          score=item["score"], methods=["graph"], entities=item["entities"],
-                         metadata={"provenance": "MENTIONS and relationship chunk_id", "graph_linked": True}) for item in ranked]
+                         metadata={"provenance": "MENTIONS entity-to-source links", "graph_linked": True}) for item in ranked]
 
     def explore(self, entity: str, label: str = "Team", limit: int = 40) -> dict:
         if label not in LABELS:
             raise ValueError("Unknown entity type")
         nodes = {}
         edges = []
-        result = self._execute(f"MATCH (n:{label})-[r]-(m) WHERE n.id = $id AND label(m) <> 'Chunk' RETURN n, r, m LIMIT $limit", {"id": entity, "limit": limit})
-        # Kuzu internal offsets determine true direction, including incoming edges.
-        for row in result:
-            for key in ("n", "m"):
-                n = row[key]
-                uid = f"{n['_label']}:{n['id']}"
-                nodes[uid] = {"id": uid, "name": n["id"], "label": n["_label"], "properties": {k: v for k, v in n.items() if not k.startswith('_')}}
-            r = row["r"]
-            source = row["n"] if row["n"]["_id"] == r["_src"] else row["m"]
-            target = row["m"] if source is row["n"] else row["n"]
-            edges.append({"source": f"{source['_label']}:{source['id']}", "target": f"{target['_label']}:{target['id']}",
-                          "type": r["_label"], "properties": {k: v for k, v in r.items() if not k.startswith('_')}})
+        # Project IDs/type only: some stored relationship string properties trigger
+        # native Kuzu crashes. No raw relationship object is decoded for exploration.
+        for direction in ("out", "in"):
+            pattern = f"(n:{label})-[r]->(m)" if direction == "out" else f"(n:{label})<-[r]-(m)"
+            result = self.query(f"MATCH {pattern} WHERE n.id = $id AND label(m) <> 'Chunk' "
+                                f"RETURN n.id AS nid, label(n) AS nlabel, m.id AS mid, label(m) AS mlabel, label(r) AS rlabel LIMIT {int(limit)}", {"id": entity})["rows"]
+            for row in result:
+                n_uid, m_uid = f"{row['nlabel']}:{row['nid']}", f"{row['mlabel']}:{row['mid']}"
+                for uid, name, node_label in ((n_uid, row["nid"], row["nlabel"]), (m_uid, row["mid"], row["mlabel"])):
+                    item = next((e for e in self.entity_catalog if e["id"] == name and e["label"] == node_label), {})
+                    nodes[uid] = {"id": uid, "name": name, "label": node_label, "properties": item.get("properties", {})}
+                edges.append({"source": n_uid if direction == "out" else m_uid,
+                              "target": m_uid if direction == "out" else n_uid,
+                              "type": row["rlabel"],
+                              "properties": {"note": "Relationship properties omitted because this snapshot has malformed evidence IDs."}})
+                if len(edges) >= limit:
+                    break
+            if len(edges) >= limit:
+                break
         if not nodes:
             match = next((e for e in self.entity_catalog if e["id"] == entity and e["label"] == label), None)
             if match:
