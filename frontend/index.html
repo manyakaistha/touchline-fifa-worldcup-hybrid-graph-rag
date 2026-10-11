@@ -8,9 +8,14 @@
     <title>Touchline — FIFA research workbench</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/static/app.css" />
+    <link rel="stylesheet" href="/static/graph.css" />
     <script src="/static/app.js" defer></script>
   </head>
   <body>
+<section class="control-help" id="help-mode" popover><button class="help-close" type="button" popovertarget="help-mode" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Research modes</h3><p>Hybrid combines graph-linked passages with semantic search. Knowledge graph follows entity links. Source passages uses the independent semantic index. Automatic tries the graph and falls back to semantic search when it has no evidence or fails.</p></section>
+<section class="control-help" id="help-sources" popover><button class="help-close" type="button" popovertarget="help-sources" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Number of sources</h3><p>Choose how many passages to retrieve: 3, 6, 9, or 12. More sources add context but may include less relevant passages. This is a result limit, not a measure of factual confidence.</p></section>
+<section class="control-help" id="help-tournament" popover><button class="help-close" type="button" popovertarget="help-tournament" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Tournament filter</h3><p>Limit passages to one tournament, for example 1934 FIFA World Cup. Leave this empty to search the archive. Questions that mention a year are also scoped to the matching edition when possible.</p></section>
+<section class="control-help" id="help-groq" popover><button class="help-close" type="button" popovertarget="help-groq" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Groq reasoning</h3><p>Enable hosted answer generation using your configured Groq key. Graph, hybrid, and automatic modes can also ask Groq to plan a read-only graph query. A question may make up to two hosted inference calls. Leave this off to browse evidence without API calls.</p></section>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="Workspace and session history">
         <div class="brand-lockup">
@@ -43,7 +48,7 @@
           </div>
           <div class="topbar-actions">
             <span class="health-pill" id="health-pill" role="status"><i></i><span>Connecting</span></span>
-            <button class="icon-button inspector-toggle" id="inspector-toggle" type="button" aria-label="Toggle research inspector" aria-pressed="true"><span class="inspector-glyph" aria-hidden="true">▥</span></button>
+            <button class="icon-button inspector-toggle" id="inspector-toggle" type="button" aria-label="Toggle research inspector" aria-pressed="true"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16M7 9h4M7 13h4"/></svg><span>Research desk</span></button>
             <button class="avatar-chip" type="button" aria-label="Local FIFA knowledge base">F<span>·</span></button>
           </div>
         </header>
@@ -89,23 +94,27 @@
                       <option value="auto">Automatic</option>
                     </select><span class="select-chevron" aria-hidden="true">⌄</span>
                   </label>
+                  <button class="control-info info-mode" type="button" popovertarget="help-mode" aria-label="Explain research modes">i</button>
                   <span class="control-divider" aria-hidden="true"></span>
                   <label class="top-k-control"><span>Sources</span>
                     <select id="top-k-select" aria-label="Number of source passages">
                       <option value="3">3</option><option value="6" selected>6</option><option value="9">9</option><option value="12">12</option>
                     </select>
                   </label>
+                  <button class="control-info info-sources" type="button" popovertarget="help-sources" aria-label="Explain number of sources">i</button>
                   <span class="control-divider tournament-divider" aria-hidden="true"></span>
                   <label class="tournament-control"><span class="sr-only">Filter by tournament (optional)</span>
                     <input id="tournament-input" type="text" list="tournament-options" maxlength="100" placeholder="All tournaments" autocomplete="off" />
                     <datalist id="tournament-options"></datalist>
                   </label>
+                  <button class="control-info info-tournament" type="button" popovertarget="help-tournament" aria-label="Explain tournament filter">i</button>
                 </div>
                 <div class="composer-right-controls">
                   <label class="generate-control" id="generate-control" title="Plans graph queries and writes cited answers; uses your Groq key">
                     <input id="generate-toggle" type="checkbox" disabled />
                     <span class="switch" aria-hidden="true"><i></i></span><span class="generate-label">Groq reasoning</span><span class="generate-lock" id="generate-lock" aria-hidden="true">⌑</span>
                   </label>
+                  <button class="control-info info-groq" type="button" popovertarget="help-groq" aria-label="Explain groq reasoning">i</button>
                   <button class="send-button" id="send-button" type="submit" aria-label="Send question">
                     <span class="send-button-text">Ask</span><span class="send-arrow" aria-hidden="true">↑</span>
                   </button>

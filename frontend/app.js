@@ -447,15 +447,21 @@
       score.textContent = Number.isFinite(item.score) && item.score !== 0 ? `● ${item.score.toFixed(2)}` : '';
       top.append(number, score);
       const title = document.createElement('div'); title.className = 'evidence-title'; title.textContent = evidenceTitle(item, index);
-      const preview = document.createElement('div'); preview.className = 'evidence-preview'; preview.textContent = item.text || 'No passage text was returned.';
+      const context = /^\[Context:\s*(.*?)\s*\|\s*Section:\s*(.*?)\]\s*/s.exec(item.text);
+      const passage = context ? item.text.slice(context[0].length) : item.text;
+      const edition = document.createElement('div'); edition.className = 'evidence-edition'; edition.textContent = item.metadata?.tournament || context?.[1] || item.source;
+      const preview = document.createElement('div'); preview.className = 'evidence-preview'; preview.textContent = passage || 'No passage text was returned.';
       const bottom = document.createElement('div'); bottom.className = 'evidence-summary-bottom';
       const source = document.createElement('span'); source.className = 'evidence-source'; source.textContent = item.source || item.id || 'Source record';
       bottom.append(source);
       if (item.methods.length) { const dot = document.createElement('span'); dot.textContent = '·'; const methods = document.createElement('span'); methods.textContent = item.methods.join(' + '); bottom.append(dot, methods); }
       const chevron = document.createElement('span'); chevron.className = 'evidence-chevron'; chevron.textContent = '⌄'; chevron.setAttribute('aria-hidden', 'true'); bottom.append(chevron);
-      summary.append(top, title, preview, bottom);
+      summary.append(top, edition, title, preview, bottom);
       const content = document.createElement('div'); content.className = 'evidence-content';
-      const text = document.createElement('div'); text.className = 'evidence-full-text'; text.textContent = item.text || 'No passage text was returned.'; content.append(text);
+      const text = document.createElement('div'); text.className = 'evidence-full-text';
+      for (const paragraph of (passage || 'No passage text was returned.').split(/\n\s*\n/)) { const p = document.createElement('p'); p.textContent = paragraph; text.append(p); }
+      const provenance = document.createElement('div'); provenance.className = 'evidence-provenance'; provenance.textContent = `Archive reference · ${item.id}`;
+      content.append(text, provenance);
       if (item.entities.length) {
         const chips = document.createElement('div'); chips.className = 'evidence-metadata';
         for (const entity of item.entities) {
@@ -601,68 +607,203 @@
     ui.graphCount.textContent = nodes.length || edges.length ? `${nodes.length} entities · ${edges.length} relationships` : 'No graph loaded';
     ui.graphListCount.textContent = String(nodes.length);
     ui.graphPlaceholder.hidden = nodes.length > 0 || edges.length > 0;
-    if (!nodes.length && !edges.length) return;
+    const legend = ensureGraphLegend(nodes);
+    if (!nodes.length && !edges.length) { legend.hidden = true; return; }
+    legend.hidden = false;
 
-    const layout = positionNodes(nodes);
+    const { positions: layout, boardSize, rootId } = positionNodes(nodes, edges);
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const nodeRadii = new Map(nodes.map((node) => [node.id, nodeRadius(node, node.id === rootId)]));
+    const graphSvg = document.getElementById('graph-svg');
+    graphSvg.setAttribute('viewBox', `0 0 ${boardSize} ${boardSize}`);
     const svgNS = 'http://www.w3.org/2000/svg';
+    const defs = document.createElementNS(svgNS, 'defs');
+    const marker = document.createElementNS(svgNS, 'marker'); marker.setAttribute('id', 'touchline-edge-arrow'); marker.setAttribute('viewBox', '0 0 8 8');
+    marker.setAttribute('refX', '6.6'); marker.setAttribute('refY', '4'); marker.setAttribute('markerWidth', '6'); marker.setAttribute('markerHeight', '6'); marker.setAttribute('orient', 'auto-start-reverse');
+    const arrow = document.createElementNS(svgNS, 'path'); arrow.setAttribute('d', 'M 0 1 L 7 4 L 0 7 z'); arrow.setAttribute('class', 'graph-arrowhead'); marker.append(arrow); defs.append(marker);
     const edgeLayer = document.createElementNS(svgNS, 'g'); edgeLayer.setAttribute('class', 'graph-edge-layer');
     for (let index = 0; index < edges.length; index += 1) {
       const edge = edges[index]; const source = layout.get(edge.source); const target = layout.get(edge.target);
       if (!source || !target) continue;
-      const line = document.createElementNS(svgNS, 'line'); line.setAttribute('x1', String(source.x)); line.setAttribute('y1', String(source.y));
-      line.setAttribute('x2', String(target.x)); line.setAttribute('y2', String(target.y)); line.setAttribute('class', `graph-edge${state.selectedEdge === index ? ' is-selected' : ''}`);
-      line.setAttribute('stroke-linecap', 'round'); line.setAttribute('tabindex', '0'); line.setAttribute('role', 'button');
-      line.setAttribute('aria-label', `${edge.source} ${edge.type} ${edge.target}`);
-      line.addEventListener('click', (event) => { event.stopPropagation(); selectEdge(index); });
-      line.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectEdge(index); } });
-      edgeLayer.append(line);
+      const isRelated = state.selectedNode && (edge.source === state.selectedNode || edge.target === state.selectedNode);
+      const isDimmed = state.selectedNode && !isRelated;
+      const group = document.createElementNS(svgNS, 'g');
+      group.setAttribute('class', `graph-edge-group${state.selectedEdge === index ? ' is-selected' : ''}${isRelated ? ' is-related' : ''}${isDimmed ? ' is-dimmed' : ''}`);
+      group.dataset.edgeIndex = String(index);
+      group.dataset.source = edge.source; group.dataset.target = edge.target;
+      const d = graphEdgePath(source, target, index, nodeRadii.get(edge.source), nodeRadii.get(edge.target));
+      const hit = document.createElementNS(svgNS, 'path'); hit.setAttribute('d', d); hit.setAttribute('class', 'graph-edge-hit');
+      hit.setAttribute('tabindex', '0'); hit.setAttribute('role', 'button');
+      hit.setAttribute('aria-label', `${nodeById.get(edge.source)?.name || edge.source} ${edge.type} ${nodeById.get(edge.target)?.name || edge.target}`);
+      const stroke = document.createElementNS(svgNS, 'path'); stroke.setAttribute('d', d); stroke.setAttribute('class', 'graph-edge');
+      stroke.dataset.type = edge.type; stroke.setAttribute('marker-end', 'url(#touchline-edge-arrow)'); stroke.setAttribute('aria-hidden', 'true');
+      const mid = graphEdgeMidpoint(source, target, index);
+      const relation = document.createElementNS(svgNS, 'text'); relation.setAttribute('class', 'graph-edge-label'); relation.setAttribute('x', String(mid.x)); relation.setAttribute('y', String(mid.y - 4));
+      relation.textContent = truncate(edge.type.replaceAll('_', ' ').toLowerCase(), 18); relation.setAttribute('aria-hidden', 'true');
+      hit.addEventListener('mouseenter', () => group.classList.add('is-hovered'));
+      hit.addEventListener('mouseleave', () => group.classList.remove('is-hovered'));
+      hit.addEventListener('focus', () => group.classList.add('is-hovered'));
+      hit.addEventListener('blur', () => group.classList.remove('is-hovered'));
+      hit.addEventListener('click', (event) => { event.stopPropagation(); selectEdge(index); });
+      hit.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectEdge(index); } });
+      group.append(stroke, relation, hit); edgeLayer.append(group);
     }
     const nodeLayer = document.createElementNS(svgNS, 'g'); nodeLayer.setAttribute('class', 'graph-node-layer');
+    const selectedEdge = state.selectedEdge === null ? null : edges[state.selectedEdge];
     for (let index = 0; index < nodes.length; index += 1) {
       const node = nodes[index]; const point = layout.get(node.id); if (!point) continue;
-      const group = document.createElementNS(svgNS, 'g'); group.setAttribute('class', `graph-node${state.selectedNode === node.id ? ' is-selected' : ''}`);
-      group.setAttribute('data-label', node.label); group.setAttribute('transform', `translate(${point.x} ${point.y})`); group.setAttribute('tabindex', '0'); group.setAttribute('role', 'button');
+      const isRoot = node.id === rootId;
+      const isRelated = selectedEdge && (selectedEdge.source === node.id || selectedEdge.target === node.id);
+      const isDimmed = (state.selectedNode && state.selectedNode !== node.id && !edges.some((edge) =>
+        (edge.source === state.selectedNode && edge.target === node.id) || (edge.target === state.selectedNode && edge.source === node.id))) ||
+        (selectedEdge && !isRelated);
+      const radius = nodeRadii.get(node.id);
+      const group = document.createElementNS(svgNS, 'g'); group.setAttribute('class', `graph-node${isRoot ? ' is-focus-node' : ''}${state.selectedNode === node.id ? ' is-selected' : ''}${isRelated ? ' is-related' : ''}${isDimmed ? ' is-dimmed' : ''}`);
+      group.setAttribute('data-label', node.label); group.setAttribute('data-node-id', node.id); group.setAttribute('transform', `translate(${point.x} ${point.y})`); group.setAttribute('tabindex', '0'); group.setAttribute('role', 'button');
       group.setAttribute('aria-label', `${node.label}: ${node.name}`);
-      const halo = document.createElementNS(svgNS, 'ellipse'); halo.setAttribute('class', 'node-halo'); halo.setAttribute('rx', '38'); halo.setAttribute('ry', '23');
-      const core = document.createElementNS(svgNS, 'circle'); core.setAttribute('class', 'node-core'); core.setAttribute('cx', '-29'); core.setAttribute('cy', '-14'); core.setAttribute('r', '3.2');
-      const label = document.createElementNS(svgNS, 'text'); label.setAttribute('text-anchor', 'middle'); label.setAttribute('y', '1'); label.textContent = truncate(node.name, 14);
-      const type = document.createElementNS(svgNS, 'text'); type.setAttribute('class', 'node-label-type'); type.setAttribute('text-anchor', 'middle'); type.setAttribute('y', '13'); type.textContent = node.label;
-      group.append(halo, core, label, type);
+      const title = document.createElementNS(svgNS, 'title'); title.textContent = `${node.label}: ${node.name}`;
+      const orbit = document.createElementNS(svgNS, 'circle'); orbit.setAttribute('class', 'node-orbit'); orbit.setAttribute('r', String(radius + 9));
+      const halo = document.createElementNS(svgNS, 'circle'); halo.setAttribute('class', 'node-halo'); halo.setAttribute('r', String(radius));
+      const center = document.createElementNS(svgNS, 'circle'); center.setAttribute('class', 'node-core'); center.setAttribute('cx', '0'); center.setAttribute('cy', isRoot ? '-17' : '-12'); center.setAttribute('r', isRoot ? '3.5' : '2.8');
+      const nameLines = wrapGraphLabel(node.name, isRoot ? 15 : 12);
+      if (nameLines.length > 1) center.setAttribute('cy', '-26');
+      const label = document.createElementNS(svgNS, 'text'); label.setAttribute('class', 'node-name'); label.setAttribute('text-anchor', 'middle'); label.setAttribute('y', nameLines.length > 1 ? '-5' : '4');
+      for (let line = 0; line < nameLines.length; line += 1) {
+        const span = document.createElementNS(svgNS, 'tspan'); span.setAttribute('x', '0'); span.setAttribute('dy', line === 0 ? '0' : '14'); span.textContent = nameLines[line]; label.append(span);
+      }
+      const type = document.createElementNS(svgNS, 'text'); type.setAttribute('class', 'node-label-type'); type.setAttribute('text-anchor', 'middle'); type.setAttribute('y', nameLines.length > 1 ? '24' : '20'); type.textContent = node.label;
+      group.append(title, orbit, halo, center, label, type);
+      group.addEventListener('mouseenter', () => highlightNodeNeighborhood(node.id, true));
+      group.addEventListener('mouseleave', () => highlightNodeNeighborhood(node.id, false));
+      group.addEventListener('focus', () => highlightNodeNeighborhood(node.id, true));
+      group.addEventListener('blur', () => highlightNodeNeighborhood(node.id, false));
       group.addEventListener('click', (event) => { event.stopPropagation(); selectNode(node); });
       group.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectNode(node); } });
       nodeLayer.append(group);
     }
-    ui.graphStage.append(edgeLayer, nodeLayer);
+    ui.graphStage.append(defs, edgeLayer, nodeLayer);
     applyGraphTransform();
     for (const node of nodes) {
       const button = document.createElement('button'); button.type = 'button'; button.className = `graph-list-item${state.selectedNode === node.id ? ' is-selected' : ''}`;
       const dot = document.createElement('i'); dot.className = 'graph-list-dot'; dot.dataset.label = node.label; dot.setAttribute('aria-hidden', 'true');
       const name = document.createElement('span'); name.className = 'graph-list-label'; name.textContent = node.name;
       const type = document.createElement('span'); type.className = 'graph-list-type'; type.textContent = node.label;
+      if (node.id === rootId) button.setAttribute('aria-label', `${node.name}, ${node.label}, focus entity`);
       button.append(dot, name, type); button.addEventListener('click', () => selectNode(node)); ui.graphNodeList.append(button);
     }
     for (let index = 0; index < edges.length; index += 1) {
       const edge = edges[index]; const button = document.createElement('button'); button.type = 'button'; button.className = `graph-list-item graph-edge-item${state.selectedEdge === index ? ' is-selected' : ''}`;
       const dot = document.createElement('i'); dot.className = 'graph-list-dot'; dot.style.background = '#9aaa67'; dot.setAttribute('aria-hidden', 'true');
-      const name = document.createElement('span'); name.className = 'graph-list-label'; name.textContent = `${edge.source} → ${edge.type} → ${edge.target}`;
+      const sourceName = nodeById.get(edge.source)?.name || edge.source;
+      const targetName = nodeById.get(edge.target)?.name || edge.target;
+      const name = document.createElement('span'); name.className = 'graph-list-label'; name.textContent = `${sourceName} → ${edge.type} → ${targetName}`;
       button.append(dot, name); button.addEventListener('click', () => selectEdge(index)); ui.graphEdgeList.append(button);
     }
   }
 
-  function positionNodes(nodes) {
-    const result = new Map();
-    if (nodes.length <= 7) {
-      const center = { x: 260, y: 180 };
-      const radius = nodes.length < 4 ? 92 : 137;
-      nodes.forEach((node, index) => {
-        const angle = -Math.PI / 2 + index * Math.PI * 2 / Math.max(1, nodes.length);
-        result.set(node.id, { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius * .72 });
-      });
-      return result;
+  function positionNodes(nodes, edges) {
+    const positions = new Map();
+    if (!nodes.length) return { positions, boardSize: 560, rootId: null };
+    const degree = new Map(nodes.map((node) => [node.id, 0]));
+    for (const edge of edges) {
+      if (degree.has(edge.source)) degree.set(edge.source, degree.get(edge.source) + 1);
+      if (degree.has(edge.target)) degree.set(edge.target, degree.get(edge.target) + 1);
     }
-    nodes.forEach((node, index) => result.set(node.id, { x: 48 + (index % 6) * 84, y: 34 + Math.floor(index / 6) * 47 }));
-    return result;
+    let root = nodes[0];
+    for (const node of nodes) if ((degree.get(node.id) || 0) > (degree.get(root.id) || 0)) root = node;
+    const satellites = nodes.filter((node) => node.id !== root.id).sort((a, b) => {
+      const labels = ['Tournament', 'Team', 'Player', 'Match', 'Stadium', 'Award'];
+      const type = labels.indexOf(a.label) - labels.indexOf(b.label);
+      return type || a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+    });
+    const ringRadii = satellites.length <= 7 ? [152] : satellites.length <= 18 ? [132, 230] : satellites.length <= 34 ? [120, 208, 296] : [112, 194, 276, 358];
+    const center = { x: 0, y: 0 };
+    positions.set(root.id, center);
+    let cursor = 0;
+    const arcSpacing = 112;
+    for (let ring = 0; cursor < satellites.length; ring += 1) {
+      const radius = ringRadii[ring] || ringRadii.at(-1) + (ring - ringRadii.length + 1) * 92;
+      const capacity = Math.max(5, Math.floor((Math.PI * 2 * radius) / arcSpacing));
+      const count = Math.min(capacity, satellites.length - cursor);
+      const phase = -Math.PI / 2 + ring * 2.399963229728653;
+      for (let offset = 0; offset < count; offset += 1) {
+        const node = satellites[cursor + offset];
+        const angle = phase + (Math.PI * 2 * offset / count);
+        positions.set(node.id, { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius });
+      }
+      cursor += count;
+    }
+    const actualOuter = Math.max(152, ...[...positions.values()].map((point) => Math.hypot(point.x, point.y)));
+    const boardSize = Math.max(560, Math.ceil((actualOuter + 86) * 2));
+    const offset = boardSize / 2;
+    for (const point of positions.values()) { point.x += offset; point.y += offset; }
+    return { positions, boardSize, rootId: root.id };
+  }
+
+  function graphEdgePath(source, target, index, sourceRadius = 0, targetRadius = 0) {
+    const dx = target.x - source.x; const dy = target.y - source.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const bendSign = index % 2 === 0 ? 1 : -1;
+    const bend = Math.min(46, distance * .13) * bendSign;
+    const nx = -dy / distance; const ny = dx / distance;
+    const c1x = source.x + dx * .34 + nx * bend; const c1y = source.y + dy * .34 + ny * bend;
+    const c2x = source.x + dx * .68 + nx * bend; const c2y = source.y + dy * .68 + ny * bend;
+    const startLength = Math.max(1, Math.hypot(c1x - source.x, c1y - source.y));
+    const endLength = Math.max(1, Math.hypot(target.x - c2x, target.y - c2y));
+    const startX = source.x + (c1x - source.x) / startLength * sourceRadius;
+    const startY = source.y + (c1y - source.y) / startLength * sourceRadius;
+    const endX = target.x - (target.x - c2x) / endLength * targetRadius;
+    const endY = target.y - (target.y - c2y) / endLength * targetRadius;
+    return `M ${startX} ${startY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${endX} ${endY}`;
+  }
+
+  function nodeRadius(node, isRoot) {
+    return isRoot ? Math.max(46, Math.min(60, 23 + Math.min(20, node.name.length) * 1.55)) : 41;
+  }
+
+  function wrapGraphLabel(value, maxChars) {
+    const words = value.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return ['Entity'];
+    const lines = [''];
+    for (const word of words) {
+      const current = lines[lines.length - 1];
+      if (current && `${current} ${word}`.length > maxChars && lines.length < 2) lines.push(word);
+      else lines[lines.length - 1] = current ? `${current} ${word}` : word;
+    }
+    lines[0] = truncate(lines[0], maxChars);
+    if (lines.length > 1) lines[1] = truncate(lines[1], maxChars);
+    return lines;
+  }
+
+  function graphEdgeMidpoint(source, target, index) {
+    const dx = target.x - source.x; const dy = target.y - source.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const bend = Math.min(46, distance * .13) * (index % 2 === 0 ? 1 : -1);
+    return { x: (source.x + target.x) / 2 - dy / distance * bend, y: (source.y + target.y) / 2 + dx / distance * bend };
+  }
+
+  function ensureGraphLegend(nodes) {
+    const panel = document.getElementById('panel-graph');
+    let legend = panel.querySelector('.graph-type-legend');
+    if (!legend) {
+      legend = document.createElement('div'); legend.className = 'graph-type-legend'; legend.setAttribute('aria-label', 'Graph node type legend');
+      ui.graphViewport.parentNode.insertBefore(legend, ui.graphViewport);
+    }
+    legend.replaceChildren();
+    const present = [...new Set(nodes.map((node) => node.label))];
+    const order = ['Tournament', 'Team', 'Player', 'Match', 'Stadium', 'Award'];
+    for (const label of order.filter((item) => present.includes(item))) {
+      const item = document.createElement('span'); item.className = 'graph-legend-item';
+      const swatch = document.createElement('i'); swatch.className = 'graph-legend-swatch'; swatch.dataset.label = label; swatch.setAttribute('aria-hidden', 'true');
+      const text = document.createElement('span'); text.textContent = label;
+      item.append(swatch, text); legend.append(item);
+    }
+    if (nodes.length) {
+      const focus = document.createElement('span'); focus.className = 'graph-legend-item graph-legend-focus';
+      const mark = document.createElement('i'); mark.setAttribute('aria-hidden', 'true');
+      const text = document.createElement('span'); text.textContent = 'Most connected'; focus.append(mark, text); legend.append(focus);
+    }
+    return legend;
   }
 
   function selectNode(node) {
@@ -671,26 +812,49 @@
     const title = document.createElement('strong'); title.textContent = node.name;
     const detail = document.createElement('span'); detail.textContent = `${node.label} · connected to ${state.graph.edges.filter((edge) => edge.source === node.id || edge.target === node.id).length} relationship(s)`;
     info.append(title, detail);
-    if (Object.keys(node.properties || {}).length) { const props = document.createElement('pre'); props.textContent = JSON.stringify(node.properties, null, 2); info.append(props); }
+    if (Object.keys(node.properties || {}).length) info.append(renderGraphProperties(node.properties));
     ui.graphSelection.append(info);
   }
 
   function selectEdge(index) {
     const edge = state.graph.edges[index]; if (!edge) return;
     state.selectedEdge = index; state.selectedNode = null; renderGraph();
+    const nodeById = new Map(state.graph.nodes.map((node) => [node.id, node]));
     const info = document.createElement('div');
     const title = document.createElement('strong'); title.textContent = edge.type;
-    const detail = document.createElement('span'); detail.textContent = `${edge.source} → ${edge.target}`;
+    const detail = document.createElement('span'); detail.textContent = `${nodeById.get(edge.source)?.name || edge.source} → ${nodeById.get(edge.target)?.name || edge.target}`;
     info.append(title, detail);
-    if (Object.keys(edge.properties || {}).length) { const props = document.createElement('pre'); props.textContent = JSON.stringify(edge.properties, null, 2); info.append(props); }
+    if (Object.keys(edge.properties || {}).length) info.append(renderGraphProperties(edge.properties));
     ui.graphSelection.append(info);
+  }
+
+  function renderGraphProperties(properties) {
+    const list = document.createElement('dl');
+    list.className = 'graph-properties';
+    for (const [key, value] of Object.entries(properties || {})) {
+      const term = document.createElement('dt');
+      term.textContent = key.replaceAll('_', ' ');
+      const description = document.createElement('dd');
+      description.textContent = value === null ? 'null' : typeof value === 'string' ? value : JSON.stringify(value);
+      list.append(term, description);
+    }
+    return list;
   }
 
   function truncate(value, max) { return value.length > max ? `${value.slice(0, max - 1)}…` : value; }
 
   function applyGraphTransform() {
     const t = state.graphTransform;
-    ui.graphStage.setAttribute('transform', `translate(${t.x} ${t.y}) scale(${t.scale})`);
+    const box = ui.graphSvg.viewBox.baseVal;
+    const centerX = box.width / 2; const centerY = box.height / 2;
+    ui.graphStage.setAttribute('transform', `translate(${centerX + t.x} ${centerY + t.y}) scale(${t.scale}) translate(${-centerX} ${-centerY})`);
+  }
+
+  function highlightNodeNeighborhood(nodeId, enabled) {
+    for (const group of ui.graphStage.querySelectorAll('.graph-edge-group')) {
+      const related = group.dataset.source === nodeId || group.dataset.target === nodeId;
+      group.classList.toggle('is-node-hover', enabled && related);
+    }
   }
 
   async function fetchGraph(options = {}) {
@@ -763,17 +927,17 @@
   }
 
   function handleGraphPointerDown(event) {
-    if (event.button !== 0 || event.target.closest('.graph-node, .graph-edge')) return;
+    if (event.button !== 0 || event.target.closest('.graph-node, .graph-edge-group')) return;
     state.drag = { x: event.clientX, y: event.clientY, ox: state.graphTransform.x, oy: state.graphTransform.y, pointerId: event.pointerId };
     ui.graphViewport.classList.add('is-dragging'); ui.graphViewport.setPointerCapture?.(event.pointerId);
   }
 
   function handleGraphPointerMove(event) {
     if (!state.drag || state.drag.pointerId !== event.pointerId) return;
-    const scaleX = ui.graphViewport.clientWidth / 520;
-    const scaleY = ui.graphViewport.clientHeight / 360;
-    state.graphTransform.x = state.drag.ox + (event.clientX - state.drag.x) / (scaleX || 1);
-    state.graphTransform.y = state.drag.oy + (event.clientY - state.drag.y) / (scaleY || 1);
+    const box = ui.graphSvg.viewBox.baseVal;
+    const scale = Math.min(ui.graphViewport.clientWidth / (box.width || 520), ui.graphViewport.clientHeight / (box.height || 360));
+    state.graphTransform.x = state.drag.ox + (event.clientX - state.drag.x) / (scale || 1);
+    state.graphTransform.y = state.drag.oy + (event.clientY - state.drag.y) / (scale || 1);
     applyGraphTransform();
   }
 

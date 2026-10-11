@@ -401,3 +401,60 @@ kbd { padding: 2px 5px; border: 1px solid rgba(255,255,255,.16); border-radius: 
 }
 
 .citation-button { border: 0; background: #e9efdb; color: #365d31; font-size: .78em; border-radius: 4px; cursor: pointer; padding: 1px 5px; vertical-align: baseline; }
+
+/* Readable evidence and self-explanatory research controls. */
+.inspector-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: auto; padding: 0 12px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.inspector-toggle[aria-pressed="true"] { background: #eaf0dc; border-color: #cbd8b0; }
+.composer-controls { align-items: center; flex-wrap: wrap; justify-content: center; gap: 12px 18px; padding-top: 12px; }
+.composer-left-controls, .composer-right-controls { justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px; }
+.composer-left-controls { flex: 1 1 auto; }
+.mode-control, .top-k-control, .generate-control { min-height: 36px; align-items: center; color: #456451; font-size: 12px; }
+.mode-control select, .top-k-control select { max-width: 155px; min-height: 36px; padding: 6px 18px 6px 3px; font-size: 12px; text-align: center; }
+.top-k-control select { max-width: 40px; padding-right: 3px; }
+.mode-spark { font-size: 16px; }
+.tournament-control input { width: 120px; min-height: 36px; font-size: 12px; text-align: center; }
+.generate-control { font-size: 12px; gap: 8px; }
+.send-button { height: 40px; min-width: 76px; font-size: 13px; }
+.send-button-text { font-size: 13px; }
+.send-arrow { width: 23px; height: 23px; font-size: 19px; }
+.composer textarea { font-size: 15px; min-height: 45px; }
+.control-info { display: inline-flex; justify-content: center; align-items: center; flex: 0 0 22px; width: 22px; height: 22px; padding: 0; border: 1px solid #cbd4c1; border-radius: 50%; background: transparent; color: #536d4d; font-family: Georgia, serif; font-style: italic; font-size: 13px; }
+.control-info:hover { background: #eaf0dc; color: #173e32; border-color: #9bac7c; }
+.control-help { position: fixed; inset: auto 16px 110px; margin: 0 auto; max-width: 410px; width: calc(100% - 32px); padding: 24px; border: 1px solid #cbd4be; border-radius: 16px; background: #fffef9; color: var(--ink); box-shadow: 0 16px 60px #173e3230; }
+.control-help h3 { margin: 0 25px 12px 0; font-family: var(--serif); font-size: 24px; font-weight: 500; }
+.control-help p { margin: 0; font-size: 14px; line-height: 1.7; color: #4c6556; }
+.help-close { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: #edf1e5; font-size: 20px; }
+.evidence-list { gap: 14px; }
+.evidence-card { border-radius: 14px; }
+.evidence-summary { padding: 17px; }
+.evidence-number, .evidence-score { font-size: 10px; }
+.evidence-edition { margin-top: 14px; color: #63804b; font-size: 11px; font-weight: 650; letter-spacing: .01em; }
+.evidence-title { margin-top: 4px; font-size: 22px; line-height: 1.2; }
+.evidence-preview { margin-top: 10px; font-size: 12px; line-height: 1.75; color: #52665a; -webkit-line-clamp: 3; }
+.evidence-summary-bottom { margin-top: 13px; font-size: 10px; flex-wrap: wrap; }
+.evidence-source { max-width: 100%; }
+.evidence-card[open] .evidence-preview { display: none; }
+.evidence-content { padding: 0 17px 17px; }
+.evidence-full-text { font-size: 13px; line-height: 1.85; white-space: normal; }
+.evidence-full-text p { margin: 10px 0; white-space: pre-wrap; }
+.evidence-provenance { margin-top: 13px; padding: 9px 0; color: #73816e; font-family: var(--mono); font-size: 9px; overflow-wrap: anywhere; border-top: 1px solid #e8ecdf; }
+.evidence-actions button, .entity-chip { font-size: 11px; }
+@media (min-width: 1151px) { .inspector { width: 380px; } .app-shell { grid-template-columns: 250px minmax(0, 1fr) 380px; } }
+@media (max-width: 600px) {
+  .inspector-toggle { padding: 0 8px; }
+  .inspector-toggle span { display: none; }
+  .composer-controls { gap: 8px; justify-content: center; }
+  .composer-left-controls { flex-basis: 100%; gap: 5px; }
+  .composer-right-controls { width: 100%; justify-content: flex-end; }
+  .composer-left-controls .control-divider { display: none; }
+  .mode-control select { max-width: 148px; font-size: 12px; }
+  .top-k-control, .generate-control { font-size: 12px; }
+  .tournament-control, .tournament-divider, .info-tournament { display: none; }
+  .send-button { height: 38px; }
+  .composer textarea { font-size: 16px; }
+  .control-help { bottom: 180px; }
+}
+@media (max-width: 600px) {
+  .composer textarea { min-height: 60px; }
+  .composer-right-controls { justify-content: center; }
+}

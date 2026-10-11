@@ -2,7 +2,7 @@
 
 Touchline is a local-first FIFA World Cup evidence workbench. Ask a question, choose graph, semantic, hybrid, or automatic retrieval, and inspect the source passages and graph context used. It serves a single-page frontend and FastAPI API from one process. Each query retrieves evidence only by default: no hosted inference is called unless you turn on generation for that request. The semantic index uses no model or embedding API.
 
-![Touchline desktop graph workbench](docs/screenshots/desktop-graph.png)
+![Touchline desktop graph workbench](docs/screenshots/refined-graph.png)
 
 [Mobile screenshot](docs/screenshots/mobile-chat.png) · [Verification](docs/verification.md) · [Engineering report](docs/engineering-report.md)
 

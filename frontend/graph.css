@@ -1,0 +1,119 @@
+/* Knowledge graph presentation: radial, deterministic, and legible at inspector width. */
+.graph-type-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 11px;
+  padding: 7px 2px 5px;
+  color: #758477;
+  font-size: 10px;
+}
+.graph-type-legend[hidden] { display: none; }
+.graph-legend-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.graph-legend-swatch { width: 8px; height: 8px; border: 1px solid currentColor; border-radius: 50%; background: currentColor; }
+.graph-legend-swatch[data-label="Tournament"] { color: #b18d4b; }
+.graph-legend-swatch[data-label="Team"] { color: #4d7956; }
+.graph-legend-swatch[data-label="Player"] { color: #bf7657; }
+.graph-legend-swatch[data-label="Match"] { color: #66859b; }
+.graph-legend-swatch[data-label="Stadium"] { color: #90769d; }
+.graph-legend-swatch[data-label="Award"] { color: #8d9f40; }
+.graph-legend-focus { margin-left: auto; color: #87956b; }
+.graph-legend-focus i { width: 10px; height: 10px; border: 1px solid #93a943; border-radius: 50%; box-shadow: 0 0 0 2px rgba(180,204,104,.19); }
+
+.graph-viewport {
+  height: clamp(290px, 38vh, 430px);
+  border-color: #dfe4d5;
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(221,232,197,.33) 0, rgba(246,247,239,.1) 44%, transparent 70%),
+    radial-gradient(ellipse at center, #fffefb 0%, #f4f6ed 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.78), 0 3px 12px rgba(38,66,41,.035);
+  cursor: grab;
+}
+.graph-viewport.is-dragging { cursor: grabbing; }
+.graph-viewport svg { overflow: visible; }
+.graph-toolbar > span::after { color: #a0aa9b; content: ' · drag to pan, scroll to zoom'; font-size: 10px; font-weight: 400; }
+
+.graph-edge-group { opacity: .67; transition: opacity .22s ease; }
+.graph-edge { fill: none; stroke: #a9bba0; stroke-width: 1.7; stroke-linecap: round; vector-effect: non-scaling-stroke; transition: stroke .18s ease, stroke-width .18s ease, opacity .18s ease; }
+.graph-edge[data-type="HOSTED_BY"] { stroke: #b79a5d; }
+.graph-edge[data-type="PLAYED_IN"] { stroke: #71916a; }
+.graph-edge[data-type="SCORED_IN"] { stroke: #c88160; }
+.graph-edge[data-type="WON_MATCH"] { stroke: #8ba548; }
+.graph-edge[data-type="HELD_AT"] { stroke: #7697a7; }
+.graph-edge[data-type="DEFEATED"] { stroke: #bd7966; }
+.graph-edge[data-type="RECEIVED_AWARD"] { stroke: #967da4; }
+.graph-arrowhead { fill: #82987b; }
+.graph-edge-group.is-hovered, .graph-edge-group.is-selected, .graph-edge-group.is-related, .graph-edge-group.is-node-hover { opacity: 1; }
+.graph-edge-group.is-hovered .graph-edge,
+.graph-edge-group.is-selected .graph-edge,
+.graph-edge-group.is-related .graph-edge,
+.graph-edge-group.is-node-hover .graph-edge { stroke: #71933f; stroke-width: 2.7; }
+.graph-edge-group.is-selected .graph-edge { stroke: #507736; stroke-width: 3.4; }
+.graph-edge-group.is-dimmed { opacity: .16; }
+.graph-edge-hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+.graph-edge-hit:focus-visible { outline: none; stroke: rgba(120,151,63,.24); stroke-width: 12; }
+.graph-edge-label {
+  fill: #83917f;
+  stroke: #f8f9f2;
+  stroke-width: 5px;
+  paint-order: stroke;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .045em;
+  opacity: 0;
+  pointer-events: none;
+  text-anchor: middle;
+  transition: opacity .16s ease;
+}
+.graph-edge-group.is-hovered .graph-edge-label,
+.graph-edge-group.is-selected .graph-edge-label,
+.graph-edge-group.is-related .graph-edge-label,
+.graph-edge-group.is-node-hover .graph-edge-label { opacity: 1; }
+
+.graph-node { cursor: pointer; outline: none; transition: opacity .2s ease; }
+.graph-node .node-orbit { fill: none; stroke: transparent; stroke-width: 1; transition: stroke .2s ease, r .2s ease; }
+.graph-node .node-halo { fill: #fffefb; stroke: #cdd9c6; stroke-width: 1.2; filter: drop-shadow(0 3px 4px rgba(34,62,39,.08)); transition: fill .2s ease, stroke .2s ease, stroke-width .2s ease, filter .2s ease; }
+.graph-node .node-core { fill: #71876f; }
+.graph-node[data-label="Tournament"] .node-halo { fill: #fbf5e6; stroke: #d5c28e; }
+.graph-node[data-label="Tournament"] .node-core { fill: #ad8a48; }
+.graph-node[data-label="Team"] .node-halo { fill: #f4f8ed; stroke: #b7cba9; }
+.graph-node[data-label="Team"] .node-core { fill: #4d7956; }
+.graph-node[data-label="Player"] .node-halo { fill: #fbf1eb; stroke: #dfb5a1; }
+.graph-node[data-label="Player"] .node-core { fill: #bf7657; }
+.graph-node[data-label="Match"] .node-halo { fill: #eff5f7; stroke: #b5c8d1; }
+.graph-node[data-label="Match"] .node-core { fill: #66859b; }
+.graph-node[data-label="Stadium"] .node-halo { fill: #f5f0f7; stroke: #d0bed7; }
+.graph-node[data-label="Stadium"] .node-core { fill: #90769d; }
+.graph-node[data-label="Award"] .node-halo { fill: #f5f7e9; stroke: #c8d28f; }
+.graph-node[data-label="Award"] .node-core { fill: #8d9f40; }
+.graph-node .node-name { fill: #284a38; font-family: var(--serif); font-size: 13px; font-weight: 600; pointer-events: none; }
+.graph-node .node-label-type { fill: #809080; font-family: var(--mono); font-size: 8px; letter-spacing: .09em; text-transform: uppercase; pointer-events: none; }
+.graph-node.is-focus-node .node-orbit { stroke: #a8bd63; stroke-dasharray: 2 4; }
+.graph-node.is-focus-node .node-halo { stroke-width: 1.8; }
+.graph-node.is-focus-node .node-name { fill: #183d32; font-size: 14px; }
+.graph-node:hover .node-orbit, .graph-node.is-selected .node-orbit, .graph-node:focus-visible .node-orbit { stroke: #8eaa4b; stroke-width: 1.7; }
+.graph-node:hover .node-halo, .graph-node.is-selected .node-halo, .graph-node:focus-visible .node-halo { fill: #f0f5dc; stroke: #87a849; stroke-width: 2; filter: drop-shadow(0 5px 7px rgba(50,79,41,.17)); }
+.graph-node.is-dimmed { opacity: .27; }
+.graph-node.is-related .node-orbit { stroke: #a7bd6b; }
+.graph-node.is-related .node-halo { stroke-width: 1.8; }
+
+.graph-selection:not(:empty) { border-color: #dce4cf; border-radius: 9px; background: linear-gradient(110deg, #fffefb 0%, #f7f8f0 100%); box-shadow: 0 2px 8px rgba(35,63,40,.035); }
+.graph-selection strong { font-size: 16px; }
+.graph-selection > span { font-size: 9px; }
+.graph-node-list { max-height: 176px; }
+.graph-edge-list { max-height: 126px; }
+.graph-list-item { padding-top: 7px; padding-bottom: 7px; font-size: 11px; }
+.graph-list-type { font-size: 7px; }
+.graph-properties { display: grid; grid-template-columns: minmax(70px, .8fr) minmax(0, 1.5fr); gap: 5px 9px; margin: 9px 0 0; padding-top: 8px; border-top: 1px solid #e8ebe1; font-size: 9px; line-height: 1.5; }
+.graph-properties dt { color: #81907f; font-family: var(--mono); font-size: 8px; overflow-wrap: anywhere; }
+.graph-properties dd { min-width: 0; margin: 0; color: #4d6651; overflow-wrap: anywhere; }
+
+@media (max-width: 720px) {
+  .graph-viewport { height: min(78vw, 360px); min-height: 260px; }
+  .graph-legend-focus { margin-left: 0; }
+  .graph-toolbar > span::after { content: ' · drag to pan, use controls to zoom'; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .graph-edge-group, .graph-edge, .graph-edge-label, .graph-node, .graph-node .node-orbit, .graph-node .node-halo { transition: none; }
+}
