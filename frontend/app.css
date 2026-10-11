@@ -458,3 +458,11 @@ kbd { padding: 2px 5px; border: 1px solid rgba(255,255,255,.16); border-radius: 
   .composer textarea { min-height: 60px; }
   .composer-right-controls { justify-content: center; }
 }
+
+/* Removing a grid column must also remove the inspector grid item. */
+@media (min-width: 1081px) {
+  .app-shell.inspector-hidden > .inspector { display: none; }
+}
+.copy-answer-icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 5px; border-radius: 6px; }
+.copy-answer-icon:hover { background: #eaf0dc; color: #345a40; }
+.copy-answer-icon svg { flex-shrink: 0; }

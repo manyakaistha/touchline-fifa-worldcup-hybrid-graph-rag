@@ -12,10 +12,10 @@
     <script src="/static/app.js" defer></script>
   </head>
   <body>
-<section class="control-help" id="help-mode" popover><button class="help-close" type="button" popovertarget="help-mode" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Research modes</h3><p>Hybrid combines graph-linked passages with semantic search. Knowledge graph follows entity links. Source passages uses the independent semantic index. Automatic tries the graph and falls back to semantic search when it has no evidence or fails.</p></section>
+<section class="control-help" id="help-mode" popover><button class="help-close" type="button" popovertarget="help-mode" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Research modes</h3><p>All four modes retrieve evidence without Groq. Hybrid combines graph-linked passages with the persistent local semantic index. Knowledge graph follows entity links. Source passages uses the independent semantic index. Automatic tries the graph and falls back to semantic search when it has no evidence or fails.</p></section>
 <section class="control-help" id="help-sources" popover><button class="help-close" type="button" popovertarget="help-sources" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Number of sources</h3><p>Choose how many passages to retrieve: 3, 6, 9, or 12. More sources add context but may include less relevant passages. This is a result limit, not a measure of factual confidence.</p></section>
 <section class="control-help" id="help-tournament" popover><button class="help-close" type="button" popovertarget="help-tournament" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Tournament filter</h3><p>Limit passages to one tournament, for example 1934 FIFA World Cup. Leave this empty to search the archive. Questions that mention a year are also scoped to the matching edition when possible.</p></section>
-<section class="control-help" id="help-groq" popover><button class="help-close" type="button" popovertarget="help-groq" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Groq reasoning</h3><p>Enable hosted answer generation using your configured Groq key. Graph, hybrid, and automatic modes can also ask Groq to plan a read-only graph query. A question may make up to two hosted inference calls. Leave this off to browse evidence without API calls.</p></section>
+<section class="control-help" id="help-groq" popover><button class="help-close" type="button" popovertarget="help-groq" popovertargetaction="hide" aria-label="Close explanation">×</button><h3>Groq answer</h3><p>Enable hosted answer generation using your configured Groq key. Graph, hybrid, and automatic modes can also ask Groq to plan a read-only graph query. A question may make up to two hosted inference calls. Leave this off to browse evidence without API calls.</p></section>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="Workspace and session history">
         <div class="brand-lockup">
@@ -112,16 +112,16 @@
                 <div class="composer-right-controls">
                   <label class="generate-control" id="generate-control" title="Plans graph queries and writes cited answers; uses your Groq key">
                     <input id="generate-toggle" type="checkbox" disabled />
-                    <span class="switch" aria-hidden="true"><i></i></span><span class="generate-label">Groq reasoning</span><span class="generate-lock" id="generate-lock" aria-hidden="true">⌑</span>
+                    <span class="switch" aria-hidden="true"><i></i></span><span class="generate-label">Groq answer</span><span class="generate-lock" id="generate-lock" aria-hidden="true">⌑</span>
                   </label>
-                  <button class="control-info info-groq" type="button" popovertarget="help-groq" aria-label="Explain groq reasoning">i</button>
+                  <button class="control-info info-groq" type="button" popovertarget="help-groq" aria-label="Explain Groq answer generation">i</button>
                   <button class="send-button" id="send-button" type="submit" aria-label="Send question">
                     <span class="send-button-text">Ask</span><span class="send-arrow" aria-hidden="true">↑</span>
                   </button>
                 </div>
               </div>
             </form>
-            <div class="composer-note"><span>Answers are grounded in the connected archive.</span><span><kbd>↵</kbd> to ask <span class="note-dot">·</span> <kbd>⇧ ↵</kbd> new line</span></div>
+            <div class="composer-note"><span>Local retrieval stays active. Groq adds a cited answer.</span><span><kbd>↵</kbd> to ask <span class="note-dot">·</span> <kbd>⇧ ↵</kbd> new line</span></div>
           </footer>
         </section>
       </main>

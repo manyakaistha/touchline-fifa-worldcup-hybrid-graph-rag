@@ -203,8 +203,12 @@
       const actions = document.createElement('div'); actions.className = 'answer-actions';
       const evidenceButton = actionButton(`⌕ ${countEvidence(result.evidence)} sources`, 'Open answer evidence');
       evidenceButton.addEventListener('click', () => { state.activeResult = result; renderEvidence(result.evidence || []); setActiveTab('evidence'); openInspector(); });
-      const copyButton = actionButton('▢ Copy answer', 'Copy this answer');
-      copyButton.addEventListener('click', () => copyText(`${turn.question}\n\n${result.answer || ''}`));
+      const copyButton = actionButton('', 'Copy this answer');
+      copyButton.classList.add('copy-answer-icon'); copyButton.title = 'Copy answer';
+      const copyIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      for (const [key, value] of Object.entries({ width: '17', height: '17', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'aria-hidden': 'true' })) copyIcon.setAttribute(key, value);
+      const copyShape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); copyShape.setAttribute('d', 'M9 9h11v11H9z M15 9V4H4v11h5'); copyIcon.append(copyShape); copyButton.append(copyIcon);
+      copyButton.addEventListener('click', () => copyText(result.answer || ''));
       const modeBadge = document.createElement('span'); modeBadge.className = 'answer-mode'; modeBadge.textContent = humanMode(result.used_mode || result.requested_mode);
       actions.append(evidenceButton, copyButton, modeBadge);
       body.append(actions);
@@ -524,8 +528,8 @@
     const canGenerate = generation.configured === true && generation.enabled === true;
     ui.generate.disabled = !canGenerate;
     ui.generate.checked = canGenerate ? ui.generate.checked : false;
-    ui.generateControl.title = canGenerate ? `Plans graph queries and writes cited answers; uses your Groq key · ${generation.model || 'Groq'}` : generation.configured === true ? 'Groq reasoning is configured but disabled by the local service.' : 'Groq reasoning is unavailable until the local service is configured and enabled.';
-    ui.generateControl.setAttribute('aria-label', canGenerate ? `Groq reasoning with ${generation.model || 'configured model'}` : 'Groq reasoning is unavailable');
+    ui.generateControl.title = canGenerate ? `Plans graph queries and writes cited answers; uses your Groq key · ${generation.model || 'Groq'}` : generation.configured === true ? 'Groq answer is configured but disabled by the local service.' : 'Groq answer is unavailable until the local service is configured and enabled.';
+    ui.generateControl.setAttribute('aria-label', canGenerate ? `Groq answer with ${generation.model || 'configured model'}` : 'Groq answer is unavailable');
     updateSourceCards(status, state.statusError);
   }
 
@@ -953,6 +957,7 @@
   function resetGraphView() { state.graphTransform = { x: 0, y: 0, scale: 1 }; applyGraphTransform(); }
 
   function openInspector() {
+    ui.shell.classList.remove('inspector-hidden');
     state.inspectorOpen = true; state.sidebarOpen = false; updateDrawers();
   }
   function toggleInspector() {

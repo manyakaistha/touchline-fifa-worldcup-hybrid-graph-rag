@@ -20,3 +20,5 @@ __pycache__/
 /references/
 node_modules/
 .DS_Store
+
+/data/source/research/

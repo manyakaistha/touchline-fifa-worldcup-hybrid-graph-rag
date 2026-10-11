@@ -87,6 +87,10 @@ The interactive frontend is served at `/`. API documentation is available at `/d
 
 A query body can include `question`, `mode`, `top_k` (1–12), `tournament`, `generate`, and `graph_reasoning`. The default is hybrid evidence retrieval without generation.
 
+## Supplemental online sources
+
+See the [verified source research](docs/online-data-sources.md) for downloadable match, award, narrative, and event datasets, observed coverage, licensing, and fetch results. These downloads have not been merged into the active semantic index.
+
 ## Data and provenance
 
 The graph’s chunk passages are the source text currently used by Touchline. The raw tournament `.txt` corpus expected by the historical notebook is not included and has not been regenerated. The notebook points to the [FIFA World Cup Wikipedia dataset on Kaggle](https://www.kaggle.com/datasets/ds22f1001123/fifa-world-cup-wikipedia-dataset); an anonymous download attempt returned HTTP 404 during project setup, so the raw source files could not be retrieved there. Existing graph chunks and processed-chunk IDs were supplied as local artifacts.
