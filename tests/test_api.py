@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import httpx
@@ -12,6 +13,8 @@ AUDITED_GRAPH = ROOT / "data" / "backups" / "fifa_production_graphrag_db(2)"
 
 @pytest.fixture(scope="module")
 def semantic_index(tmp_path_factory):
+    if not AUDITED_GRAPH.exists():
+        pytest.skip("audited Kuzu backup is unavailable in this checkout")
     path = tmp_path_factory.mktemp("semantic-index")
     result = build_index(AUDITED_GRAPH, path)
     assert result["documents"] == 828
@@ -77,7 +80,35 @@ def test_query_endpoint_runs_hybrid_against_real_graph_and_local_index(client):
     assert "X-Content-Type-Options" in response.headers
 
 
+def test_stream_endpoint_emits_evidence_before_done_without_generation(client):
+    response = client.post(
+        "/api/query/stream",
+        json={
+            "question": "Who hosted the 1934 FIFA World Cup?",
+            "mode": "graph",
+            "top_k": 4,
+            "generate": False,
+            "tournament": "1934 FIFA World Cup",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = [
+        json.loads(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert [event["type"] for event in events] == ["result", "done"]
+    result = events[0]["result"]
+    assert result["evidence"]
+    assert result["generation"] == "evidence_only"
+    assert any("1934 FIFA World Cup" in item["text"] for item in result["evidence"])
+
+
 def test_missing_semantic_index_is_reported_and_graph_mode_remains_available(tmp_path):
+    if not AUDITED_GRAPH.exists():
+        pytest.skip("audited Kuzu backup is unavailable in this checkout")
     missing_index = tmp_path / "not-built"
     with TestClient(create_app(make_settings(missing_index))) as test_client:
         status = test_client.get("/api/status").json()
@@ -97,7 +128,7 @@ def test_missing_semantic_index_is_reported_and_graph_mode_remains_available(tmp
     assert payload["used_mode"] == "none"
     assert payload["evidence"] == []
     assert payload["generation"] == "no_evidence"
-    assert any("no matching evidence" in item.lower() for item in payload["diagnostics"])
+    assert any("semantic retrieval unavailable" in item.lower() for item in payload["diagnostics"])
     assert not missing_index.exists()
 
 

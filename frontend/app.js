@@ -192,7 +192,7 @@
     body.append(meta);
     if (result) {
       const answer = document.createElement('div'); answer.className = `answer-copy${result.answer ? '' : ' is-empty'}`;
-      answer.textContent = result.answer || 'The service returned no generated answer. Review the evidence in the research desk.';
+      appendAnswer(answer, result);
       body.append(answer);
       if (Array.isArray(result.diagnostics) && result.diagnostics.length) {
         for (const diagnostic of result.diagnostics) {
@@ -222,6 +222,23 @@
     aRow.append(assistantIcon, body);
     wrap.append(aRow);
     ui.messageList.append(wrap);
+  }
+
+  function appendAnswer(element, result) {
+    const text = result.answer || 'The service returned no generated answer. Review the evidence in the research desk.';
+    for (const part of text.split(/(\*\*[^*]+\*\*|\[\d+\])/g)) {
+      if (/^\*\*[^*]+\*\*$/.test(part)) {
+        const strong = document.createElement('strong'); strong.textContent = part.slice(2, -2); element.append(strong);
+      } else if (/^\[\d+\]$/.test(part) && Number(part.slice(1, -1)) <= (result.evidence || []).length) {
+        const citation = document.createElement('button'); citation.type = 'button'; citation.className = 'citation-button'; citation.textContent = part;
+        citation.setAttribute('aria-label', `Open source ${part.slice(1, -1)}`);
+        citation.addEventListener('click', () => {
+          state.activeResult = result; renderEvidence(result.evidence || []); setActiveTab('evidence'); openInspector();
+          const card = document.getElementById(`evidence-${Number(part.slice(1, -1))}`);
+          if (card) { card.open = true; card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+        }); element.append(citation);
+      } else element.append(document.createTextNode(part));
+    }
   }
 
   function actionButton(label, aria) {
@@ -422,11 +439,11 @@
     ui.evidenceEmpty.hidden = items.length > 0;
     for (let index = 0; index < items.length; index += 1) {
       const item = normalizeEvidence(items[index]);
-      const card = document.createElement('details'); card.className = 'evidence-card';
+      const card = document.createElement('details'); card.className = 'evidence-card'; card.id = `evidence-${index + 1}`;
       const summary = document.createElement('summary'); summary.className = 'evidence-summary';
       const top = document.createElement('div'); top.className = 'evidence-summary-top';
       const number = document.createElement('span'); number.className = 'evidence-number'; number.textContent = `SOURCE ${String(index + 1).padStart(2, '0')}`;
-      const score = document.createElement('span'); score.className = 'evidence-score';
+      const score = document.createElement('span'); score.className = 'evidence-score'; score.title = 'Retrieval ranking score, not factual confidence';
       score.textContent = Number.isFinite(item.score) && item.score !== 0 ? `● ${item.score.toFixed(2)}` : '';
       top.append(number, score);
       const title = document.createElement('div'); title.className = 'evidence-title'; title.textContent = evidenceTitle(item, index);
@@ -532,7 +549,7 @@
     ui.sourceCards.append(sourceCard('Answer generation', generation.configured === true && generation.enabled === true,
       generation.configured === true && generation.enabled === true ? 'Enabled' : generation.configured === true ? 'Disabled' : 'Not configured',
       generation.model ? `Plans graph queries and writes cited answers · ${generation.model} via Groq` : 'Plans graph queries and writes cited answers; uses your Groq key.', generation.error));
-    const diagnostics = [];
+    const diagnostics = [...(graph.warnings || [])];
     for (const [label, value] of [['Graph', graph.error], ['Passages', semantic.error], ['Generation', generation.error]]) {
       if (value) diagnostics.push(`${label}: ${value}`);
     }
@@ -815,16 +832,16 @@
     const canvas = el('pitch-canvas'); const wrap = el('pitch-art-wrap'); const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const rng = mulberry32(0xF1FA26);
-    let width = 0, height = 0, strokes = [], visible = true, raf = 0, lastFrame = 0, reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const strokes = Array.from({ length: 150 }, () => ({
+      x: rng(), y: rng(), len: 2 + rng() * 7, rise: 2 + rng() * 5, phase: rng() * Math.PI * 2, alpha: .08 + rng() * .14,
+    }));
+    let width = 0, height = 0, visible = true, raf = 0, lastFrame = 0, reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const resize = () => {
       const rect = wrap.getBoundingClientRect(); width = rect.width; height = rect.height;
       if (!width || !height) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      strokes = Array.from({ length: Math.floor(width * .34) }, () => ({
-        x: rng() * width, y: rng() * height, len: 2 + rng() * 7, rise: 2 + rng() * 5, phase: rng() * Math.PI * 2, alpha: .08 + rng() * .14,
-      }));
       draw(0);
     };
     const draw = (time) => {
@@ -841,9 +858,10 @@
       ctx.restore();
       const phase = reduced ? 0 : Math.sin(time / 2500) * 1.3;
       for (const blade of strokes) {
-        ctx.beginPath(); ctx.moveTo(blade.x, blade.y);
+        const x = blade.x * width, y = blade.y * height;
+        ctx.beginPath(); ctx.moveTo(x, y);
         const sway = reduced ? 0 : Math.sin(time / 1000 + blade.phase) * 1.7;
-        ctx.quadraticCurveTo(blade.x + sway + phase, blade.y - blade.rise * .55, blade.x + sway, blade.y - blade.rise);
+        ctx.quadraticCurveTo(x + sway + phase, y - blade.rise * .55, x + sway, y - blade.rise);
         ctx.strokeStyle = `rgba(94, 122, 63, ${blade.alpha})`; ctx.lineWidth = blade.len > 7 ? 1 : .7; ctx.stroke();
       }
       ctx.beginPath(); ctx.ellipse(width * .72, height * .68, 4, 2.1, -.2, 0, Math.PI * 2); ctx.fillStyle = 'rgba(194, 215, 94, .7)'; ctx.fill();

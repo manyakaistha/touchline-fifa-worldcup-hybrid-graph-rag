@@ -1,4 +1,6 @@
+import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fifa_rag.graph import GraphStore, validate_cypher
@@ -9,6 +11,8 @@ AUDITED_GRAPH = ROOT / "data" / "backups" / "fifa_production_graphrag_db(2)"
 
 @pytest.fixture(scope="module")
 def graph():
+    if not AUDITED_GRAPH.exists():
+        pytest.skip("audited Kuzu backup is unavailable in this checkout")
     store = GraphStore(AUDITED_GRAPH)
     try:
         assert store.health()["available"], store.health()["error"]
@@ -117,3 +121,33 @@ def test_cypher_validator_adds_a_default_limit_and_accepts_safe_read_query():
 def test_cypher_validator_rejects_writes_comments_unbounded_or_invalid_limits(query):
     with pytest.raises(ValueError):
         validate_cypher(query)
+
+
+def _unopened_store():
+    """A query-capable shell for subprocess boundary tests; never opens Kuzu."""
+    store = object.__new__(GraphStore)
+    store.path = Path("/nonexistent/read-only-test-graph")
+    store.timeout_ms = 100
+    store.conn = object()
+    store.error = None
+    return store
+
+
+def test_query_worker_crash_is_reported_without_crashing_the_application(monkeypatch):
+    monkeypatch.setattr(
+        "fifa_rag.graph.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=-11, stdout="", stderr=""),
+    )
+
+    with pytest.raises(RuntimeError, match="isolated graph query failed"):
+        _unopened_store().query("MATCH (n:Team) RETURN n.id LIMIT 1")
+
+
+def test_query_worker_timeout_is_reported(monkeypatch):
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
+
+    monkeypatch.setattr("fifa_rag.graph.subprocess.run", timeout)
+
+    with pytest.raises(RuntimeError, match="timed out"):
+        _unopened_store().query("MATCH (n:Team) RETURN n.id LIMIT 1")

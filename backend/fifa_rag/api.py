@@ -88,7 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                     used = "hybrid" if semantic else "graph"
                                 else:
                                     evidence, used = planned, "graph"
-                                diagnostics.append("Evidence includes sources returned by a validated Groq graph query.")
+                                diagnostics.append("Evidence includes sources returned by a validated Groq graph query. Graph rows are extracted records; verify them against the passages.")
                             else:
                                 diagnostics.append("The planned query returned no usable source IDs; deterministic retrieval was retained.")
                         except (ValueError, RuntimeError):

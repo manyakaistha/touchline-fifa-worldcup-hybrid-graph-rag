@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#f4f2e9" />
     <meta name="description" content="A local-first FIFA knowledge graph and evidence workbench." />
     <title>Touchline — FIFA research workbench</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/static/app.css" />
     <script src="/static/app.js" defer></script>
   </head>
@@ -132,7 +133,7 @@
           <div id="evidence-empty" class="inspector-empty"><span class="empty-symbol">⌕</span><strong>Trace every answer</strong><p>Source passages and extracted entities will appear here.</p></div>
         </div>
         <div class="inspector-panel" id="panel-graph" role="tabpanel" aria-labelledby="tab-graph" hidden>
-          <div class="panel-intro graph-intro"><span class="panel-kicker">ENTITY NEIGHBOURHOOD</span><p>Explore the connected record. Select a node or edge to inspect it.</p></div>
+          <div class="panel-intro graph-intro"><span class="panel-kicker">ENTITY NEIGHBOURHOOD</span><p>Explore extracted records. Relationships can be inaccurate; confirm them in source passages.</p></div>
           <form class="entity-search" id="entity-search-form">
             <label class="sr-only" for="entity-search">Search entities</label><span aria-hidden="true">⌕</span><input id="entity-search" type="search" placeholder="Find a team, player, match…" autocomplete="off" />
             <button type="submit" aria-label="Search entities">↵</button>
@@ -140,7 +141,7 @@
           <div class="entity-results" id="entity-results" role="listbox" aria-label="Matching archive entities" aria-live="polite" hidden></div>
           <div class="graph-toolbar"><span id="graph-count">No graph loaded</span><div><button type="button" id="zoom-out" aria-label="Zoom out">−</button><button type="button" id="zoom-reset" aria-label="Reset graph view">⌂</button><button type="button" id="zoom-in" aria-label="Zoom in">＋</button></div></div>
           <div class="graph-viewport" id="graph-viewport" tabindex="0" role="region" aria-label="Interactive knowledge graph. Use the entity list below to navigate by keyboard.">
-            <svg id="graph-svg" viewBox="0 0 520 360" aria-hidden="true"><g id="graph-stage"></g></svg>
+            <svg id="graph-svg" viewBox="0 0 520 360" role="group" aria-label="Extracted knowledge graph"><g id="graph-stage"></g></svg>
             <div class="graph-placeholder" id="graph-placeholder"><span class="graph-placeholder-mark">◌</span><span>Relationships from your question will appear here.</span></div>
           </div>
           <div class="graph-selection" id="graph-selection" aria-live="polite"></div>

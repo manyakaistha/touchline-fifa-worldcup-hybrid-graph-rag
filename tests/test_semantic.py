@@ -54,7 +54,7 @@ def test_persisted_index_search_and_tournament_filter(tmp_path):
     assert health["method"] == "TF–IDF / latent semantic analysis"
     results = store.search("Who won the 1930 final?", top_k=3)
     assert results
-    assert {result.id for result in results} == {"chunk-1930", "chunk-1950", "chunk-mascot"}
+    assert {result.id for result in results} == {"chunk-1930"}
     filtered = store.search("Who won the final?", top_k=3, tournament="1930 FIFA World Cup")
     assert filtered
     assert all(result.metadata["tournament"] == "1930 FIFA World Cup" for result in filtered)
@@ -93,3 +93,14 @@ def test_empty_index_is_available_but_has_no_results(tmp_path):
     assert store.health()["available"] is False
     assert store.health()["document_count"] == 0
     assert store.search("World Cup final") == []
+
+
+def test_independent_jsonl_ingestion_preserves_sources_and_rejects_duplicate_ids(tmp_path):
+    from fifa_rag.semantic import ingest_documents
+    documents = [{"id": "test-source", "text": "[Context: Test tournament | Section: Final]\nA fixture final was decided by a penalty.", "source": "test fixture", "entities": ["fixture team"]}]
+    result = ingest_documents(documents, tmp_path)
+    assert result["documents"] == 1
+    store = SemanticStore(tmp_path)
+    assert store.search("penalty")[0].source == "test fixture"
+    with pytest.raises(ValueError, match="Duplicate"):
+        ingest_documents(documents * 2, tmp_path)

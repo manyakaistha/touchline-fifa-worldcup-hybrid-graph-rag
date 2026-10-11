@@ -199,6 +199,28 @@ def build_index(graph_path: str | Path, semantic_path: str | Path) -> dict[str, 
     return {"version": version, "documents": len(documents), "path": str(semantic_path)}
 
 
+def ingest_documents(documents: list[dict[str, Any]], semantic_path: str | Path) -> dict[str, Any]:
+    """Explicit independent ingestion of trustworthy JSONL records, without a graph."""
+    normalized = []
+    seen = set()
+    for document in documents:
+        identifier, text = document.get("id"), document.get("text")
+        if not isinstance(identifier, str) or not identifier.strip() or not isinstance(text, str) or not text.strip():
+            raise ValueError("Each document must have a nonempty string id and text")
+        if identifier in seen:
+            raise ValueError(f"Duplicate document identifier: {identifier}")
+        seen.add(identifier)
+        metadata = document.get("metadata", {})
+        entities = document.get("entities", [])
+        if not isinstance(metadata, dict) or not isinstance(entities, list) or not all(isinstance(e, str) for e in entities):
+            raise ValueError("metadata must be an object and entities a list of strings")
+        tournament, section = _anchors(text)
+        normalized.append({"id": identifier, "text": text.strip(), "source": str(document.get("source", identifier)),
+                           "entities": entities, "metadata": {"tournament": tournament, "section": section, **metadata}})
+    version = _write_snapshot(Path(semantic_path), normalized)
+    return {"version": version, "documents": len(normalized), "path": str(semantic_path)}
+
+
 class SemanticStore:
     """Read-only query interface for a persistent local semantic index."""
 
@@ -284,10 +306,13 @@ class SemanticStore:
         scores = self._embeddings @ vector
         filtered: list[tuple[float, dict[str, Any]]] = []
         requested = tournament.casefold() if tournament else None
+        years = re.findall(r"\b(?:18|19|20)\d{2}\b", question) if not requested else []
         for score, document in zip(scores, self._documents):
             metadata = document.get("metadata", {})
             stored_tournament = metadata.get("tournament")
             if requested and (not stored_tournament or requested not in stored_tournament.casefold()):
+                continue
+            if years and (not stored_tournament or not any(year in stored_tournament for year in years)):
                 continue
             if score > 0.05:
                 filtered.append((float(score), document))

@@ -59,6 +59,34 @@ class MockAsyncClient:
         return self.response
 
 
+class MockStreamResponse:
+    def __init__(self, lines):
+        self.lines = lines
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        return False
+
+    def raise_for_status(self):
+        return None
+
+    async def aiter_lines(self):
+        for line in self.lines:
+            yield line
+
+
+class MockStreamingClient(MockAsyncClient):
+    def stream(self, method, url, *, headers, json):
+        self.calls.append((method, url, headers, json))
+        return MockStreamResponse([
+            'data: {"choices":[{"delta":{"content":"Italy hosted the tournament "}}]}',
+            'data: {"choices":[{"delta":{"content":"【1†L1-L4】."}}]}',
+            "data: [DONE]",
+        ])
+
+
 def test_no_evidence_is_a_clear_abstention_without_provider_use(monkeypatch):
     def unexpected_client(*args, **kwargs):
         pytest.fail("provider client must not be constructed without evidence")
@@ -148,6 +176,32 @@ def test_generation_provider_failure_is_mocked_and_does_not_leak_credentials(mon
     assert "private-unit-secret" not in answer
     assert "private-unit-secret" not in " ".join(diagnostics)
     assert diagnostics and "ConnectError" in diagnostics[0]
+
+
+def test_stream_answer_yields_mocked_provider_tokens_and_normalized_completion(monkeypatch, evidence):
+    client = MockStreamingClient()
+    monkeypatch.setattr("fifa_rag.generation.httpx.AsyncClient", lambda **kwargs: client)
+    configured = settings(
+        api_key="unit-test-key",
+        enabled=True,
+        groq_model="test-model",
+        groq_base_url="https://provider.invalid/v1",
+    )
+
+    async def collect():
+        return [part async for part in Generator(configured).stream_answer("Who hosted it?", evidence)]
+
+    parts = asyncio.run(collect())
+
+    assert [part["type"] for part in parts] == ["token", "token", "complete"]
+    assert parts[-1]["answer"] == "Italy hosted the tournament [1]."
+    assert parts[-1]["generation"] == "groq"
+    assert parts[-1]["diagnostics"] == []
+    method, url, headers, payload = client.calls[0]
+    assert method == "POST"
+    assert url == "https://provider.invalid/v1/chat/completions"
+    assert headers == {"Authorization": "Bearer unit-test-key"}
+    assert payload["stream"] is True
 
 
 def test_invalid_provider_citation_is_reported_as_failure(monkeypatch, evidence):
