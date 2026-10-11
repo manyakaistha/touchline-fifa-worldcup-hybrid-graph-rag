@@ -16,7 +16,7 @@ The frontend is plain HTML, CSS, and JavaScript served by FastAPI. It has no bui
 
 Keep graph access read-only. Do not run notebook extraction, migrations, or bulk graph writes as part of application startup. The supported launcher is `make run` (`uv run python -m fifa_rag.startup`). Indexing is separate and explicit: `make index` reads the existing graph and writes a local semantic snapshot under ignored `data/semantic/`.
 
-Do not replace, rename, or edit supplied root database files, their WAL, notebook exports, or processed-chunk lists during routine work. The matching copies under ignored `data/backups/` are for preservation and audit. Check hashes against `data/original-manifest.json` when a change could affect original artifacts. Keep credentials in the ignored local `.env`; never add keys to source, tests, logs, or documentation.
+Do not replace, rename, or edit supplied root database files, their WAL, notebook exports, or processed-chunk lists during routine work. The matching copies under ignored `data/backups/` are for preservation and audit. Keep separate checksum-verified backups before any operation that could affect original artifacts. Keep credentials in the ignored local `.env`; never add keys to source, tests, logs, or documentation.
 
 Hosted inference requires an explicit generated-answer request from the user. `ENABLE_PAID_INFERENCE` defaults to true as an availability gate; set it to false to forbid inference even when the UI requests it. Tests should use fake transports or injected settings and must not call Groq or other paid services. Retrieval and semantic indexing must not add neural model downloads or embedding API dependencies.
 

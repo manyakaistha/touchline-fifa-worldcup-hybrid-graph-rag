@@ -4,7 +4,7 @@ Touchline is a local-first FIFA World Cup evidence workbench. Ask a question, ch
 
 ![Touchline desktop graph workbench](docs/screenshots/refined-graph.png)
 
-[Mobile screenshot](docs/screenshots/mobile-chat.png) · [Verification](docs/verification.md) · [Engineering report](docs/engineering-report.md)
+[Mobile screenshot](docs/screenshots/mobile-chat.png)
 
 ## Run locally
 
@@ -49,7 +49,7 @@ Results are evidence passages, not a complete set of records. The API limits a r
 
 Groq graph planning is an explicit option available only with generation enabled, the service configured for inference, and a non-semantic retrieval mode. The planned query must use the actual schema and return chunk IDs so the service can recover source passages. Invalid or unusable plans fall back to deterministic evidence lookup. Synthesis is grounded in retrieved passages and citation indices are checked, but citation validation does not establish factual entailment. Review every claim against its cited source.
 
-The graph schema and current audited counts are described in [`docs/database-audit.md`](docs/database-audit.md); system boundaries are in [`docs/architecture.md`](docs/architecture.md).
+Inspect the connected graph schema and counts at `/api/schema`. The architecture diagram below shows the retrieval boundaries.
 
 ## Build the local semantic index
 
@@ -89,13 +89,13 @@ A query body can include `question`, `mode`, `top_k` (1–12), `tournament`, `ge
 
 ## Supplemental online sources
 
-See the [verified source research](docs/online-data-sources.md) for downloadable match, award, narrative, and event datasets, observed coverage, licensing, and fetch results. These downloads have not been merged into the active semantic index.
+Potential supplements include [Fjelstul’s World Cup database](https://github.com/jfjelstul/worldcup), [Openfootball match records](https://github.com/openfootball/worldcup.json), and Wikipedia narrative passages. Check each source’s licensing and attribution before ingestion. These sources have not been merged into the active semantic index.
 
 ## Data and provenance
 
 The graph’s chunk passages are the source text currently used by Touchline. The raw tournament `.txt` corpus expected by the historical notebook is not included and has not been regenerated. The notebook points to the [FIFA World Cup Wikipedia dataset on Kaggle](https://www.kaggle.com/datasets/ds22f1001123/fifa-world-cup-wikipedia-dataset); an anonymous download attempt returned HTTP 404 during project setup, so the raw source files could not be retrieved there. Existing graph chunks and processed-chunk IDs were supplied as local artifacts.
 
-The audit found 828 chunk records in the selected graph, with evidence links on many relationships. Extraction quality is uneven: the graph has 27 Award nodes but zero `RECEIVED_AWARD` relationships, and only nine `HELD_AT` relationships. These counts describe extracted records, not complete World Cup history. See [`docs/artifact-inventory.md`](docs/artifact-inventory.md) and [`data/original-manifest.json`](data/original-manifest.json) for the root-artifact inventory and SHA-256 baseline. Hash-matched database copies are documented in the inventory and stored under ignored `data/backups/`.
+The audit found 828 chunk records in the selected graph, with evidence links on many relationships. Extraction quality is uneven: the graph has 27 Award nodes but zero `RECEIVED_AWARD` relationships, and only nine `HELD_AT` relationships. These counts describe extracted records, not complete World Cup history. Original artifacts and preservation backups are kept locally and excluded from this repository.
 
 The notebook and filenames identify a Wikipedia-derived corpus distributed through Kaggle. Verify the upstream dataset’s license and attribution requirements before redistributing its text or derivatives. No license has been granted here for unique supplied originals, and this repository does not add an assumed blanket license. Do not treat the absence of a top-level `LICENSE` as a grant of rights.
 
@@ -138,7 +138,7 @@ flowchart LR
   LLM -->|Real token stream| UI
 ```
 
-The supplied graph has malformed relationship evidence IDs and some native property-projection failures. The graph explorer projects IDs and types without decoding unsafe relationship properties; arbitrary and generated queries execute in a time-limited child process. **No repair or migration has modified the original database.** Source grounding uses intact Chunk text and MENTIONS links. Read the [provenance audit](docs/provenance-audit.md) before using extracted relationships analytically.
+The supplied graph has malformed relationship evidence IDs and some native property-projection failures. The graph explorer projects IDs and types without decoding unsafe relationship properties; arbitrary and generated queries execute in a time-limited child process. **No repair or migration has modified the original database.** Source grounding uses intact Chunk text and MENTIONS links. Extracted relationships require independent validation before analytical use.
 
 ## Configuration
 
@@ -177,14 +177,13 @@ curl http://127.0.0.1:8000/api/query \
 backend/fifa_rag/     configuration, graph access/worker, semantic retrieval,
                      fusion, generation, API and startup
 frontend/            original static interface and procedural pitch
-scripts/             read-only audits, asset verification, explicit index build
+scripts/             explicit semantic index build
 tests/               database integration and offline failure regression tests
-docs/                audits, architecture, design, reviews, orchestration
- data/               original hash manifest and graph audit metadata
+docs/screenshots/    actual application screenshots
 .github/workflows/   lint, JavaScript syntax and offline test CI
 ```
 
-Original databases, notebook exports, processed trackers, backups, `.env`, and generated vectors are ignored in Git. Restore the user-supplied production database to `GRAPH_PATH`, retain any companion files, and run `make index`. Do not substitute a fresh empty database. `uv run python scripts/verify_assets.py` checks the 11 supplied originals against their initial hashes; this requires those originals locally. A public checkout has no data blobs: data-backed tests skip when the audited backup is absent, while guard, fusion, semantic-fixture, and provider tests run offline.
+Original databases, notebook exports, processed trackers, backups, `.env`, and generated vectors are ignored in Git. Restore the user-supplied production database to `GRAPH_PATH`, retain any companion files, and run `make index`. Do not substitute a fresh empty database. A public checkout has no data blobs: data-backed tests skip when the audited backup is absent, while guard, fusion, semantic-fixture, and provider tests run offline.
 
 ## Troubleshooting and limits
 
@@ -202,4 +201,4 @@ The graph is an incomplete and sometimes incorrect extraction, not an authoritat
 
 Possible next steps include independently validating extracted facts, repairing provenance on a separate approved copy, stronger hosted semantic embeddings, conversational query rewriting, evaluation against human-reviewed question/answer pairs, and authenticated deployment.
 
-See [verification](docs/verification.md), [engineering report](docs/engineering-report.md), [design references](docs/design-references.md), and [agent execution](docs/orchestration.md). The layout adapts the supplied [analytics chat reference](https://github.com/manyakaistha/nl-analytics-query-engine) and the Type Garden reference from the generative micro-interactions skill through original football visuals; no reference source code was copied. Licensing remains an explicit owner decision before public release.
+The interface takes layout inspiration from the [analytics chat reference](https://github.com/manyakaistha/nl-analytics-query-engine), with original football visuals. No reference source code was copied. Licensing remains an explicit owner decision before public release.

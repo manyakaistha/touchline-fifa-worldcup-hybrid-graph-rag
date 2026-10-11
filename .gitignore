@@ -22,3 +22,14 @@ node_modules/
 .DS_Store
 
 /data/source/research/
+
+# Local audits, internal AI reports and source artifacts
+/docs/*.md
+/data/graph-audit.json
+/data/original-manifest.json
+/scripts/audit_databases.py
+/scripts/verify_assets.py
+*.ipynb
+*.sqlite
+*.sqlite3
+*.bin

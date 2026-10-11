@@ -1,4 +1,4 @@
-.PHONY: run index test check audit
+.PHONY: run index test check
 run:
 	uv run python -m fifa_rag.startup
 index:
@@ -9,5 +9,3 @@ check:
 	uv run ruff check backend scripts tests
 	node --check frontend/app.js
 	uv run pytest -q
-audit:
-	uv run python scripts/audit_databases.py
